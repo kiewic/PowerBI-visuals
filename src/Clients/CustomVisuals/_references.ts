@@ -30,6 +30,7 @@
 
 /// <reference path="visuals/consoleWriter/consoleWriter.ts"/>
 /// <reference path="visuals/helloIVisual/helloIVisual.ts"/>
+/// <reference path="visuals/waffleChart/waffleChart.ts"/>
 /// <reference path="visuals/asterPlot/asterPlot.ts"/>
 /// <reference path="visuals/streamGraph/streamGraph.ts"/>
 /// <reference path="visuals/sunburst/sunburst.ts"/>

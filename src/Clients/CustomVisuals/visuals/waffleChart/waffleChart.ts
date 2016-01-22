@@ -1,0 +1,663 @@
+﻿/*
+ *  Power BI Visualizations
+ *
+ *  Copyright (c) Microsoft Corporation
+ *  All rights reserved. 
+ *  MIT License
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy
+ *  of this software and associated documentation files (the ""Software""), to deal
+ *  in the Software without restriction, including without limitation the rights
+ *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *  copies of the Software, and to permit persons to whom the Software is
+ *  furnished to do so, subject to the following conditions:
+ *   
+ *  The above copyright notice and this permission notice shall be included in 
+ *  all copies or substantial portions of the Software.
+ *   
+ *  THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ *  THE SOFTWARE.
+ */
+
+/// <reference path="../../_references.ts"/>
+
+module powerbi.visuals.samples {
+    import SelectionManager = utility.SelectionManager;
+
+    export interface WaffleChartLayout {
+        rows: number;
+        columns: number;
+        totalArea: number;
+    }
+
+    export interface WaffleChartViewModel {
+        count: number;
+        labelsArray: Array<string>;
+        values: Array<number>;
+        paths: Array<string>;
+    }
+
+    export interface SingleWaffleChartInitOptions {
+        root: D3.Selection;
+        path: string;
+    }
+
+    export interface SingleWaffleChartUpdateOptions {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        fontFamily: string;
+        value: number;
+        text: string;
+        defaultDataPointColor: string;
+    }
+
+    export interface ISingleWaffleChart {
+        init(options: SingleWaffleChartInitOptions): void;
+        destroy?(): void;
+        update?(options: SingleWaffleChartUpdateOptions): void;
+    }
+
+    // DevTools do not support yet `export const waffleChartRoleNames`.
+    var waffleChartRoleNames = {
+        category: 'Category',
+        values: 'Values',
+        minValue: 'Minimum Value',
+        maxValue: 'Maximum Value',
+        paths: 'Paths'
+    };
+
+    // DevTools do not support yet `export const waffleChartCapabilities: VisualCapabilities`.
+    var waffleChartCapabilities: VisualCapabilities = {
+        dataRoles: [{
+            name: waffleChartRoleNames.category,
+            kind: VisualDataRoleKind.Grouping,
+            displayName: data.createDisplayNameGetter('Role_DisplayName_Group'),
+            description: data.createDisplayNameGetter('Role_DisplayName_GroupFunnelDescription')
+        }, {
+            name: waffleChartRoleNames.paths,
+            kind: VisualDataRoleKind.Grouping,
+            displayName: 'Paths',
+            description: 'The value used to customize the shape of the data points',
+            requiredTypes: [{ text: true }],
+        }, {
+            name: waffleChartRoleNames.values,
+            kind: VisualDataRoleKind.Measure,
+            displayName: data.createDisplayNameGetter('Role_DisplayName_Values'),
+            description: data.createDisplayNameGetter('Role_DisplayName_ValuesDescription'),
+            requiredTypes: [{ numeric: true }, { integer: true }],
+        }, {
+            name: waffleChartRoleNames.minValue,
+            kind: VisualDataRoleKind.Measure,
+            displayName: data.createDisplayNameGetter('Role_DisplayName_MinValue'),
+            description: data.createDisplayNameGetter('Role_DisplayName_MinValueDescription'),
+            requiredTypes: [{ numeric: true }, { integer: true }],
+        }, {
+            name: waffleChartRoleNames.maxValue,
+            kind: VisualDataRoleKind.Measure,
+            displayName: data.createDisplayNameGetter('Role_DisplayName_MaxValue'),
+            description: data.createDisplayNameGetter('Role_DisplayName_MaxValueDescription'),
+            requiredTypes: [{ numeric: true }, { integer: true }],
+        }],
+        dataViewMappings: [{
+            categorical: {
+                categories: {
+                    for: { in: waffleChartRoleNames.category },
+                    dataReductionAlgorithm: { top: {} }
+                },
+                values: {
+                    group: {
+                        by: waffleChartRoleNames.paths,
+                        select: [{ for: { in: waffleChartRoleNames.values } }],
+                        dataReductionAlgorithm: { top: {} }
+                    }
+                },
+                rowCount: { preferred: { min: 2 }, supported: { min: 0 } }
+            },
+        }],
+        objects: {
+            general: {
+                displayName: data.createDisplayNameGetter('Visual_General'),
+                properties: {
+                    formatString: {
+                        type: { formatting: { formatString: true } },
+                    },
+                },
+            },
+            dataPoint: {
+                displayName: data.createDisplayNameGetter('Visual_DataPoint'),
+                description: data.createDisplayNameGetter('Visual_DataPointDescription'),
+                properties: {
+                    defaultColor: {
+                        displayName: data.createDisplayNameGetter('Visual_DefaultColor'),
+                        type: { fill: { solid: { color: true } } }
+                    },
+                    fill: {
+                        displayName: data.createDisplayNameGetter('Visual_Fill'),
+                        type: { fill: { solid: { color: true } } }
+                    },
+                    fillRule: {
+                        displayName: data.createDisplayNameGetter('Visual_Gradient'),
+                        type: { fillRule: {} },
+                        rule: {
+                            inputRole: 'Gradient',
+                            output: {
+                                property: 'fill',
+                                selector: ['Category'],
+                            },
+                        },
+                    }
+                }
+            }
+        },
+    };
+
+    // DevTools do not support yet `export const waffleChartProps`.
+    var waffleChartProps = {
+        dataPoint: {
+            defaultColor: <DataViewObjectPropertyIdentifier>{ objectName: 'dataPoint', propertyName: 'defaultColor' },
+        },
+    };
+
+    export class WaffleChart implements IVisual {
+        public static capabilities: VisualCapabilities = waffleChartCapabilities;
+
+        private static DefaultText = 'Invalid DV';
+        private root: D3.Selection;
+        private dataView: DataView;
+        private selectiionManager: SelectionManager;
+        private singleWaffleChartArray: Array<SingleWaffleChart>;
+        private count: number;
+        private defaultDataPointColor: string;
+
+        public static converter(dataView: DataView): WaffleChartViewModel {
+            // TODO: throw exception if there is no categorical view, however the following exception
+            // is swallowed by Power BI Desktop and so it is useless.
+            //if (!dataView.categorical) {
+            //    throw 'No categorical data.';
+            //}
+
+            var labelsArray: Array<string>;
+            if (dataView.categorical.categories && dataView.categorical.categories.length > 0) {
+                // Copy array.
+                labelsArray = dataView.categorical.categories[0].values.slice();
+            }
+
+            var values: Array<number>;
+            var minValues: Array<number>;
+            var maxValues: Array<number>;
+            var paths: Array<string>;
+            var totals: Array<number>;
+
+            if (dataView.categorical.values && dataView.metadata && dataView.metadata.columns) {
+                var categoricalValues = dataView.categorical.values;
+                var metadataColumns = dataView.metadata.columns;
+
+                var grouped = categoricalValues.grouped();
+                var pathsGroups: Array<string> = [];
+                for (var  i = 0; i < grouped.length; i++) {
+                    var pathD = WaffleChart.sanitizePathD(grouped[i].name);
+                    pathsGroups.push(pathD);
+                }
+
+                // Arrays are got by reference, so, modifying the array modifies the source too.
+                var currentPathIndex: number = 0;
+                for (var i = 0; i < categoricalValues.length; i++) {
+                    var localValues = categoricalValues[i].values;
+                    var col = metadataColumns[i];
+
+                    // Note: 'roles' is the wrong way to do this, I don't know why, but use 'source' instead.
+                    if (DataRoleHelper.hasRole(categoricalValues[i].source, waffleChartRoleNames.values)) {
+                        if (!totals) {
+                            totals = new Array(localValues.length);
+                            for (var j = 0; j < totals.length; j++) {
+                                totals[j] = 0;
+                            }
+                            paths = new Array(localValues.length);
+                        }
+
+                        // totals += localValues
+                        WaffleChart.sumValues(totals, localValues, paths, pathsGroups[currentPathIndex]);
+
+                        // These values were for the current path, move to the next one.
+                        currentPathIndex++;
+                    }
+                    else if (DataRoleHelper.hasRole(categoricalValues[i].source, waffleChartRoleNames.minValue)) {
+                        minValues = localValues;
+                    }
+                    else if (DataRoleHelper.hasRole(categoricalValues[i].source, waffleChartRoleNames.maxValue)) {
+                        maxValues = localValues;
+                    }
+                    else {
+                        console.log("No matching source ...");
+                        console.log(categoricalValues[i].source);
+                    }
+                }
+            }
+
+            if (!totals) {
+                // TODO: Find something appropriate to show when the categorical data does not follow the capabilities.
+                totals = [1, 2, 3, 4, 5, 6, 7];
+            }
+
+            var count : number;
+            if (labelsArray && values) {
+                count = Math.max(labelsArray.length, values.length);
+            }
+            else if (labelsArray) {
+                count = labelsArray.length;
+            }
+            else if (values) {
+                count = values.length;
+            }
+            else {
+                console.log('No categories or values.');
+            }
+
+            // If there are no values so far, create an array full of zeros.
+            if (values === undefined) {
+                values = [];
+                for (var i = 0; i < count; i++) {
+                    values.push(0);
+                }
+            }
+
+            if (values) {
+                // Normalize values.
+                var maxValue : number = Math.max.apply(null, values);
+
+                // If there are min and max values, calculate percentage.
+                // If numbers are bellow 100, consider values are already percentages.
+                // Otherwise, calculate percentages considering the max value in values to be the 100%.
+                if (minValues && maxValues)
+                {
+                    for (var i = 0; i < values.length; i++) {
+                        var range = maxValues[i] - minValues[i];
+
+                        // TODO: Validate that values[i] is greater than minValues[i].
+                        values[i] = Math.round((values[i] - minValues[i]) * 100 / range);
+                    }
+                }
+                else if (maxValue > 100) {
+                    // Do cross multiplication.
+                    console.log("maxValue: " + maxValue);
+                    for (var i = 0; i < values.length; i++) {
+                        values[i] = Math.round(values[i] * 100 / maxValue);
+                    }
+                }
+            }
+
+            var viewModel: WaffleChartViewModel = {
+                labelsArray: labelsArray,
+                values: totals,
+                paths: paths,
+                count: count,
+            };
+
+            return viewModel;
+        }
+
+        public init(options: VisualInitOptions): void {
+            this.defaultDataPointColor = 'Coral';
+
+            this.root = d3.select(options.element.get(0))
+                .append('svg');
+
+            this.selectiionManager = new SelectionManager({ hostServices: options.host });
+        }
+
+        private initWaffles(newCount: number, paths: Array<string>): void {
+            // TODO: To improve performance, skip this method if count and paths have not changed.
+
+            // We need to remove all waffles before creating new ones.
+            if (this.singleWaffleChartArray) {
+                for (var i = 0; i < this.count; i++) {
+                    this.singleWaffleChartArray[i].remove();
+                }
+            }
+
+            this.count = newCount;
+            
+            // Create new waffles.
+            this.singleWaffleChartArray = new Array();
+            for (var i = 0; i < this.count; i++) {
+                this.singleWaffleChartArray[i] = new SingleWaffleChart();
+                this.singleWaffleChartArray[i].init({
+                    root: this.root,
+                    path: paths ? paths[i] : null,
+                });
+            }
+        }
+
+        public update(options: VisualUpdateOptions) {
+            if (!options.dataViews || !options.dataViews[0]) return;
+            var dataView = this.dataView = options.dataViews[0];
+            var viewport = options.viewport;
+
+            var viewModel: WaffleChartViewModel = WaffleChart.converter(dataView);
+            this.initWaffles(viewModel.count, viewModel.paths);
+
+            if (dataView.metadata && dataView.metadata.objects) {
+                var defaultColor = DataViewObjects.getFillColor(dataView.metadata.objects, waffleChartProps.dataPoint.defaultColor);
+                if (defaultColor) {
+                    this.defaultDataPointColor = defaultColor;
+                }
+            }
+
+            this.root.attr({
+                'height': viewport.height,
+                'width': viewport.width
+            });
+
+            var bestLayout = WaffleChart.getBestLayout(options.viewport, this.count);
+            var waffleViewport = WaffleChart.getWaffleSize({
+                width: options.viewport.width / bestLayout.columns,
+                height: options.viewport.height / bestLayout.rows,
+            });
+
+            var globalX = viewport.width / 2 - waffleViewport.width * bestLayout.columns / 2;
+            var globalY = viewport.height / 2 - waffleViewport.height * bestLayout.rows / 2;
+            for (var i = 0; i < this.count; i++) {
+                var localX = globalX + waffleViewport.width  * (i % bestLayout.columns);
+                var localY = globalY + waffleViewport.height * Math.floor(i / bestLayout.columns);
+
+                this.singleWaffleChartArray[i].update({
+                    x: localX,
+                    y: localY,
+                    width: waffleViewport.width,
+                    height: waffleViewport.height,
+                    fontFamily: 'tahoma',
+                    value: viewModel.values && viewModel.values[i] ? viewModel.values[i] : 0,
+                    text: viewModel.labelsArray && viewModel.labelsArray[i] ? viewModel.labelsArray[i] : 'null',
+                    defaultDataPointColor: this.defaultDataPointColor,
+                });
+            }
+        }
+
+        // Return null if path[d] contains invalid characters.
+        private static sanitizePathD(pathD: string) {
+            var regex = /[bdfgijknopruwxy]+/gi;
+            if (regex.test(pathD)) {
+                return null;
+            }
+            return pathD;
+        }
+
+        private static sumValues(totals: Array<number>, localValues: Array<number>, paths: Array<string>, currentPath:string) {
+            for (var i = 0; i < localValues.length; i++) {
+                if (localValues[i]) {
+                    paths[i] = currentPath;
+                    totals[i] += localValues[i];
+                }
+            }
+        }
+
+        private static getBestLayout(viewport: IViewport, count: number): WaffleChartLayout {
+            var bestLayout = {
+                rows: 0,
+                columns: 0,
+                totalArea: 0,
+            };
+
+            // Find the best layout (rows x columns) by choosing the layout with larger area.
+            for (var i = 1; i <= count;  i++) {
+                for (var j = 1; j <= count;  j++) {
+                    if (i * j >= count) {
+                        var currentArea : WaffleChartLayout = WaffleChart.calculateArea(viewport, count, i, j);
+                        if (currentArea.totalArea > bestLayout.totalArea) {
+                            bestLayout = currentArea
+                        }
+                    }
+                }
+            }
+
+            return bestLayout;
+        }
+
+        private static calculateArea(viewport: IViewport, count: number, rows: number, columns: number): WaffleChartLayout {
+            var waffleViewport: IViewport = WaffleChart.getWaffleSize({
+                width: viewport.width / columns,
+                height: viewport.height / rows,
+            });
+
+            var totalArea = waffleViewport.width * waffleViewport.height * count;
+
+            return {
+                rows: rows,
+                columns: columns,
+                totalArea: totalArea,
+            };
+        }
+
+        private static getWaffleSize(viewport: IViewport): IViewport {
+            // Cross-multiplications:
+            //     600            : 800
+            //     viewport.width : height
+            //     width          : viewport.height
+
+            if (viewport.width * 800 / 600 <= viewport.height) {
+                return {
+                    width: viewport.width,
+                    height: viewport.width * 800 / 600
+                };
+            }
+
+            return {
+                width: viewport.height * 600 / 800,
+                height: viewport.height
+            };
+        }
+
+        public enumerateObjectInstances(options: EnumerateVisualObjectInstancesOptions): VisualObjectInstanceEnumeration {
+            var enumeration = new ObjectEnumerationBuilder();
+
+            switch (options.objectName) {
+                case 'dataPoint':
+                    this.enumerateDataPoints(enumeration);
+                    break;
+            }
+
+            return enumeration.complete();
+        }
+
+        private enumerateDataPoints(enumeration: ObjectEnumerationBuilder): void {
+            enumeration.pushInstance({
+                objectName: 'dataPoint',
+                selector: null,
+                properties: {
+                    defaultColor: { solid: { color: this.defaultDataPointColor } }
+                },
+            });
+        }
+
+        public destroy(): void {
+            console.log("Call to destroy()");
+            this.root = null;
+            for (var i = 0; i < this.count; i++) {
+                this.singleWaffleChartArray[i].destroy();
+            }
+        }
+    }
+
+    export class SingleWaffleChart implements ISingleWaffleChart {
+        private waffleG : D3.Selection;
+        private backgroundRect: D3.Selection;
+        private dotG : D3.Selection;
+        private dotBackgroundRect: D3.Selection;
+        private dotRect: SVGRect;
+        private dotArray : Array<Array<D3.Selection>>;
+        private textG : D3.Selection;
+        private percentageText: D3.Selection;
+        private descText: D3.Selection;
+
+        public remove() {
+            this.waffleG.remove();
+        }
+
+        public init(options: SingleWaffleChartInitOptions): void {
+            this.waffleG = options.root
+                .append('g');
+
+            this.backgroundRect = this.waffleG
+                .append('rect');
+
+            this.dotG = this.waffleG
+                .append('g');
+
+            this.dotBackgroundRect = this.dotG
+                .append('rect');
+
+            this.dotArray = new Array();
+            for (var i = 0; i < 10; i++) {
+                this.dotArray[i] = new Array(10);
+            
+                for (var j = 0; j < 10; j++) {
+                    if (options.path) {
+                        this.dotArray[i][j] = this.dotG
+                            .append('path')
+                            .attr('d', options.path);
+                    }
+                    else {
+                        this.dotArray[i][j] = this.dotG
+                            .append('circle');
+                    }
+                }
+            }
+
+            // dotArray[i][j][0][0] is a SVGPathElement.
+            this.dotRect = this.dotArray[0][0][0][0].getBBox();
+
+            this.textG = this.waffleG
+                .append('g');
+
+            this.percentageText = this.textG
+                .append('text')
+                .style('cursor', 'pointer')
+                .style('stroke', 'Red')
+                .style('stroke-width', '0px')
+                .style('font-weight', 'bold')
+                .attr('text-anchor', 'middle');
+
+            this.descText = this.textG
+                .append('text')
+                .style('cursor', 'pointer')
+                .style('stroke', 'Red')
+                .style('stroke-width', '0px')
+                .attr('text-anchor', 'middle');
+        }
+
+        public update(options: SingleWaffleChartUpdateOptions) {
+            this.waffleG
+                .attr('transform', 'matrix(1 0 0 1 ' + options.x + ' ' + options.y + ')');
+
+            this.backgroundRect
+                .style({
+                    'fill': 'LightCyan',
+                    'width': options.width,
+                    'height': options.height,
+                });
+
+            var dotGMargin = 20;
+            var dotGX = dotGMargin;
+            var dotGY = dotGMargin;
+            this.dotG
+                .classed('foo', true)
+                .attr("transform", function(d){
+                    return "matrix(1 0 0 1 " + dotGX + " " + dotGY + ")";
+                });
+
+            var dotGHeight = Math.min(options.height, options.width);
+            var chartSide = dotGHeight - dotGMargin * 2;
+
+            this.dotBackgroundRect.style({
+                'fill': 'LightCyan',
+                'width': chartSide,
+                'height': chartSide,
+            });
+
+            var percentage = options.value;
+            var percentageString = percentage.toString() + '%';
+
+            var dataPointSide = chartSide / 10;
+            var radio: number = null;
+            var scaleValue: number = null;
+            
+            if (this.dotRect && this.dotRect.height > 0 && this.dotRect.width > 0) {
+                // Data point is a path.
+                scaleValue = dataPointSide / this.dotRect.height;
+            }
+            else {
+                // Data point is a circle.
+                radio = dataPointSide / 2;
+            }
+
+            for (var i = 9; i >= 0; i--) {
+                for (var j = 0; j < 10; j++) {
+                    this.dotArray[i][j]
+                        .style({
+                            'fill': percentage-- > 0 ? options.defaultDataPointColor : 'LightBlue',
+                        });
+                        
+                    if (radio) {
+                        this.dotArray[i][j].attr({
+                            'r': radio,
+                            'cy': radio + dataPointSide * i,
+                            'cx': radio + dataPointSide * j,
+                        });
+                    }
+                    else {
+                        this.dotArray[i][j].attr({
+                            'transform': 'translate(' + (dataPointSide * j) + ' ' + (dataPointSide * i) + ') scale(' + scaleValue + ')',
+                        });
+                    }
+                }
+            }
+
+            var textGX = 0;
+            var textGY = Math.min(options.height, options.width);
+            var textGHeight = Math.max(options.height, options.width) - textGY;
+            this.textG
+                .attr("transform", "matrix(1 0 0 1 " + textGX + " " + textGY + ")");
+            
+            // Divide by 2, because there are 2 lines of code.
+            // And divide by 3 because the 15% on the top and 15% on the bottom should be margin.
+            var percentageTextMargin = textGHeight / 2 / 6;
+
+            var fontSize = textGHeight / 2 - percentageTextMargin * 2;
+            var percentageTextY = fontSize / 2 + percentageTextMargin;
+
+            this.percentageText.style({
+                'fill': options.defaultDataPointColor,
+                'font-size': fontSize + 'px',
+                'font-family': options.fontFamily,
+            }).text(
+                percentageString)
+            .attr({
+                'y': percentageTextY + 'px',
+                'x': options.width / 2,
+            });
+
+            var descTextY = textGHeight / 2 + fontSize / 2 + percentageTextMargin;
+
+            this.descText.style({
+                'fill': 'DarkSlateGray',
+                'font-size': fontSize + 'px',
+                'font-family': options.fontFamily,
+            }).text(
+                options.text)
+            .attr({
+                'y': descTextY + 'px',
+                'x': options.width / 2,
+            });
+        }
+
+        public destroy(): void {
+        }
+    }
+}
