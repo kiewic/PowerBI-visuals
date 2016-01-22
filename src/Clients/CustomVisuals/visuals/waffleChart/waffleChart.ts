@@ -189,7 +189,6 @@ module powerbi.visuals.samples {
                 labelsArray = dataView.categorical.categories[0].values.slice();
             }
 
-            var values: Array<number>;
             var minValues: Array<number>;
             var maxValues: Array<number>;
             var paths: Array<string>;
@@ -247,48 +246,47 @@ module powerbi.visuals.samples {
             }
 
             var count : number;
-            if (labelsArray && values) {
-                count = Math.max(labelsArray.length, values.length);
+            if (labelsArray && totals) {
+                count = Math.max(labelsArray.length, totals.length);
             }
             else if (labelsArray) {
                 count = labelsArray.length;
             }
-            else if (values) {
-                count = values.length;
+            else if (totals) {
+                count = totals.length;
             }
             else {
                 console.log('No categories or values.');
             }
 
             // If there are no values so far, create an array full of zeros.
-            if (values === undefined) {
-                values = [];
+            if (totals === undefined) {
+                totals = [];
                 for (var i = 0; i < count; i++) {
-                    values.push(0);
+                    totals.push(0);
                 }
             }
 
-            if (values) {
+            if (totals) {
                 // Normalize values.
-                var maxValue : number = Math.max.apply(null, values);
+                var maxValue: number = Math.max.apply(null, totals);
 
                 // If there are min and max values, calculate percentage.
-                // If numbers are bellow 100, consider values are already percentages.
-                // Otherwise, calculate percentages considering the max value in values to be the 100%.
-                if (minValues && maxValues)
-                {
-                    for (var i = 0; i < values.length; i++) {
+                // If numbers are bellow 100, consider totals are already percentages.
+                // Otherwise, calculate percentages considering the max value in totals to be the 100%.
+                if (minValues && maxValues) {
+                    for (var i = 0; i < totals.length; i++) {
                         var range = maxValues[i] - minValues[i];
 
-                        // TODO: Validate that values[i] is greater than minValues[i].
-                        values[i] = Math.round((values[i] - minValues[i]) * 100 / range);
+                        // TODO: Validate that totals[i] is greater than minValues[i].
+                        totals[i] = Math.round((totals[i] - minValues[i]) * 100 / range);
                     }
                 }
                 else if (maxValue > 100) {
                     // Do cross multiplication.
                     console.log("maxValue: " + maxValue);
-                    for (var i = 0; i < values.length; i++) {
-                        values[i] = Math.round(values[i] * 100 / maxValue);
+                    for (var i = 0; i < totals.length; i++) {
+                        totals[i] = Math.round(totals[i] * 100 / maxValue);
                     }
                 }
             }
