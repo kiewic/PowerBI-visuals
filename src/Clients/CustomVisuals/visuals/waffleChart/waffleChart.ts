@@ -585,12 +585,13 @@ module powerbi.visuals.samples {
             var dataPointSide = chartSide / 10;
             var radio: number = null;
             var scaleValue: number = null;
-            
+            var padding: number = 3;
+
             if (this.dotRect && this.dotRect.height > 0 && this.dotRect.width > 0) {
                 // Data point is a path.
                 // Calculate scale using the largest of height or width to make sure the path will stay within
                 // the data point bounds.
-                scaleValue = dataPointSide / Math.max(this.dotRect.height, this.dotRect.width);
+                scaleValue = (dataPointSide - padding) / Math.max(this.dotRect.height, this.dotRect.width);
             }
             else {
                 // Data point is a circle.
