@@ -240,10 +240,10 @@ module powerbi.visuals.samples {
                 }
             }
 
-            if (!totals) {
-                // TODO: Find something appropriate to show when the categorical data does not follow the capabilities.
-                totals = [1, 2, 3, 4, 5, 6, 7];
-            }
+            //// TODO: Find something appropriate to show when the categorical data does not follow the capabilities.
+            //if (!totals) {
+            //    totals = [1, 2, 3, 4, 5, 6, 7];
+            //}
 
             var count : number;
             if (labelsArray && totals) {
