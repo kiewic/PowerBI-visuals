@@ -372,7 +372,7 @@ module powerbi.visuals.samples {
                     height: waffleViewport.height,
                     fontFamily: 'tahoma',
                     value: viewModel.values && viewModel.values[i] ? viewModel.values[i] : 0,
-                    text: viewModel.labelsArray && viewModel.labelsArray[i] ? viewModel.labelsArray[i] : 'null',
+                    text: viewModel.labelsArray && viewModel.labelsArray[i] ? viewModel.labelsArray[i] : '(Blank)',
                     defaultDataPointColor: this.defaultDataPointColor,
                 });
             }
