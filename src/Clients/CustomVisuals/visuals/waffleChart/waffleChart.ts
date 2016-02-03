@@ -571,7 +571,10 @@ module powerbi.visuals.samples {
                 });
 
             var dotGHeight = Math.min(options.height, options.width);
-            var chartSide = dotGHeight - dotGMargin * 2;
+            var chartSide = 0;
+            if (dotGHeight >= dotGMargin * 2) {
+                chartSide = dotGHeight - dotGMargin * 2;
+            }
 
             this.dotBackgroundRect.style({
                 'fill': 'LightCyan',
@@ -591,7 +594,10 @@ module powerbi.visuals.samples {
                 // Data point is a path.
                 // Calculate scale using the largest of height or width to make sure the path will stay within
                 // the data point bounds.
-                scaleValue = (dataPointSide - padding) / Math.max(this.dotRect.height, this.dotRect.width);
+                scaleValue = 0;
+                if (dataPointSide >= padding) {
+                    scaleValue = (dataPointSide - padding) / Math.max(this.dotRect.height, this.dotRect.width);
+                }
             }
             else {
                 // Data point is a circle.
@@ -605,7 +611,7 @@ module powerbi.visuals.samples {
                             'fill': percentage-- > 0 ? options.defaultDataPointColor : 'LightBlue',
                         });
                         
-                    if (radio) {
+                    if (radio !== null) {
                         this.dotArray[i][j].attr({
                             'r': radio,
                             'cy': radio + dataPointSide * i,
