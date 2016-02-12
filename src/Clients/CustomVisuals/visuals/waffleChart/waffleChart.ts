@@ -41,6 +41,8 @@ module powerbi.visuals.samples {
     export interface WaffleChartViewModel {
         count: number;
         labelsArray: Array<string>;
+        identities: DataViewScopeIdentity[];
+        objects: DataViewObjects[];
         values: Array<number>;
         paths: Array<string>;
     }
@@ -58,7 +60,8 @@ module powerbi.visuals.samples {
         fontFamily: string;
         value: number;
         text: string;
-        defaultDataPointColor: string;
+        identity: DataViewScopeIdentity;
+        color: string;
     }
 
     export interface ISingleWaffleChart {
@@ -165,6 +168,7 @@ module powerbi.visuals.samples {
     var waffleChartProps = {
         dataPoint: {
             defaultColor: <DataViewObjectPropertyIdentifier>{ objectName: 'dataPoint', propertyName: 'defaultColor' },
+            fill: { objectName: 'dataPoint', propertyName: 'fill' }
         },
     };
 
@@ -187,9 +191,15 @@ module powerbi.visuals.samples {
             //}
 
             var labelsArray: Array<string>;
+            var identities: DataViewScopeIdentity[];
+            var objects: DataViewObjects[];
             if (dataView.categorical.categories && dataView.categorical.categories.length > 0) {
-                // Copy array.
-                labelsArray = dataView.categorical.categories[0].values.slice();
+                var category0 = dataView.categorical.categories[0]; 
+                
+                // Copy arrays.
+                labelsArray = category0.values.slice();
+                identities = category0.identity.slice();
+                objects = category0.objects ? category0.objects.slice() : null;
             }
 
             var minValues: Array<number>;
@@ -296,6 +306,8 @@ module powerbi.visuals.samples {
 
             var viewModel: WaffleChartViewModel = {
                 labelsArray: labelsArray,
+                identities: identities,
+                objects: objects,
                 values: totals,
                 paths: paths,
                 count: count,
@@ -338,10 +350,13 @@ module powerbi.visuals.samples {
         }
 
         public update(options: VisualUpdateOptions) {
+            var debugMessage = undefined;
+            
             // Adding try, because something started failing after upgrading Desktop client to January 2016 version.
             try {
                 if (!options.dataViews || !options.dataViews[0]) return;
                 var dataView = this.dataView = options.dataViews[0];
+                debugMessage = JSON.stringify(dataView.categorical.categories);
                 var viewport = options.viewport;
 
                 var viewModel: WaffleChartViewModel = WaffleChart.converter(dataView);
@@ -351,7 +366,7 @@ module powerbi.visuals.samples {
                 alert(err);
             }
             
-            this.debug.update(options, undefined);
+            this.debug.update(options, debugMessage);
 
             if (dataView.metadata && dataView.metadata.objects) {
                 var defaultColor = DataViewObjects.getFillColor(dataView.metadata.objects, waffleChartProps.dataPoint.defaultColor);
@@ -385,9 +400,15 @@ module powerbi.visuals.samples {
                     fontFamily: 'tahoma',
                     value: viewModel.values && viewModel.values[i] ? viewModel.values[i] : 0,
                     text: viewModel.labelsArray && viewModel.labelsArray[i] ? viewModel.labelsArray[i] : '(Blank)',
-                    defaultDataPointColor: this.defaultDataPointColor,
+                    identity: viewModel.identities && viewModel.identities[i] ? viewModel.identities[i] : null, 
+                    color: viewModel.objects && viewModel.objects[i] ? WaffleChart.getColor(viewModel.objects[i], this.defaultDataPointColor) : this.defaultDataPointColor,
                 });
             }
+        }
+        
+        private static getColor(objects: DataViewObjects, defaultDataPointColor: string): string {
+            var colorHelper = new ColorHelper(new DataColorPalette(), waffleChartProps.dataPoint.fill, defaultDataPointColor);
+            return colorHelper.getColorForMeasure(objects, "");
         }
 
         // Return null if path[d] contains invalid characters.
@@ -484,6 +505,21 @@ module powerbi.visuals.samples {
                     defaultColor: { solid: { color: this.defaultDataPointColor } }
                 },
             });
+            
+            if (this.singleWaffleChartArray) {
+                for (var i = 0; i < this.singleWaffleChartArray.length; i++) {
+                    var singleWaffle = this.singleWaffleChartArray[i]; 
+
+                    enumeration.pushInstance({
+                        objectName: 'dataPoint',
+                        displayName: singleWaffle.getText(),
+                        selector: ColorHelper.normalizeSelector(SelectionId.createWithId(singleWaffle.getIdentity()).getSelector(), false),
+                        properties: {
+                            fill: { solid: { color: singleWaffle.getColor() } }
+                        },
+                    });
+                } 
+            }
         }
 
         public destroy(): void {
@@ -505,6 +541,7 @@ module powerbi.visuals.samples {
         private textG : D3.Selection;
         private percentageText: D3.Selection;
         private descText: D3.Selection;
+        private options: SingleWaffleChartUpdateOptions;
 
         public remove() {
             this.waffleG.remove();
@@ -563,6 +600,8 @@ module powerbi.visuals.samples {
         }
 
         public update(options: SingleWaffleChartUpdateOptions) {
+            this.options = options;
+            
             this.waffleG
                 .attr('transform', 'matrix(1 0 0 1 ' + options.x + ' ' + options.y + ')');
 
@@ -620,7 +659,7 @@ module powerbi.visuals.samples {
                 for (var j = 0; j < 10; j++) {
                     this.dotArray[i][j]
                         .style({
-                            'fill': percentage-- > 0 ? options.defaultDataPointColor : 'LightBlue',
+                            'fill': percentage-- > 0 ? this.options.color : 'LightBlue',
                         });
                         
                     if (radio !== null) {
@@ -652,7 +691,7 @@ module powerbi.visuals.samples {
             var percentageTextY = fontSize / 2 + percentageTextMargin;
 
             this.percentageText.style({
-                'fill': options.defaultDataPointColor,
+                'fill': this.options.color,
                 'font-size': fontSize + 'px',
                 'font-family': options.fontFamily,
             }).text(
@@ -669,7 +708,7 @@ module powerbi.visuals.samples {
                 'font-size': fontSize + 'px',
                 'font-family': options.fontFamily,
             }).text(
-                options.text)
+                this.options.text)
             .attr({
                 'y': descTextY + 'px',
                 'x': options.width / 2,
@@ -677,6 +716,18 @@ module powerbi.visuals.samples {
         }
 
         public destroy(): void {
+        }
+        
+        public getText(): string {
+            return this.options.text;
+        }
+        
+        public getIdentity(): DataViewScopeIdentity {
+            return this.options.identity;
+        }
+        
+        public getColor(): string {
+            return this.options.color;
         }
     }
     
@@ -689,7 +740,7 @@ module powerbi.visuals.samples {
                 .select('svg');
         }
         
-        public update(options: VisualUpdateOptions, err) {
+        public update(options: VisualUpdateOptions, message: string) {
             var viewport = options.viewport;
             var dataView = options.dataViews[0];
             var categoricalValues = dataView.categorical.values;
@@ -712,8 +763,8 @@ module powerbi.visuals.samples {
             var p = foBody.append('p');
             p.attr('style', 'font-size:11px;')
 
-            if (err) {
-                var text = p.text(JSON.stringify(err));
+            if (message) {
+                var text = p.text(message);
             }
             else {
                 var text = p.text(JSON.stringify(dataView.categorical));
