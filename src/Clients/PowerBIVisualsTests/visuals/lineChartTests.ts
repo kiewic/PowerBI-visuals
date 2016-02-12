@@ -24,7 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
+
 
 module powerbitests {
     import AxisType = powerbi.visuals.axisType;
@@ -258,6 +258,31 @@ module powerbitests {
             };
             let actualData = LineChart.converter(dataView, blankCategoryValue, colors, false);
             expect(actualData.series).toEqual([]);
+        });
+
+        it('validate tooltip info not being created when tooltips are disabled', () => {
+            let metadata: powerbi.DataViewMetadata = {
+                columns: [
+                    dataViewMetadata.columns[0],
+                    powerbi.Prototype.inherit(dataViewMetadata.columns[1], c => c.objects = { dataPoint: { fill: { solid: { color: '#41BEE0' } } } }),
+                ]
+            };
+            let dataView: powerbi.DataView = {
+                metadata: metadata,
+                categorical: {
+                    categories: [{
+                        source: metadata.columns[0],
+                        values: ['John Domo', 'Delta Force', 'Jean Tablau'],
+                    }],
+                    values: DataViewTransform.createValueColumns([{
+                        source: metadata.columns[1],
+                        values: [100, 200, 700],
+                        subtotal: 1000
+                    }])
+                }
+            };
+            let actualData = LineChart.converter(dataView, blankCategoryValue, colors, false, undefined, undefined, undefined, false);
+            expect(actualData.series[0].data[0].tooltipInfo).toBeUndefined();
         });
 
         it('Check convert categorical + fill color', () => {
@@ -2805,8 +2830,7 @@ module powerbitests {
 
             it('line chart validate word breaking axis labels', (done) => {
                 // Word break will only tend to trigger when graphs are wider than they are high
-                v.update({
-                    viewport: { height: 320, width: 640 },
+                v.onDataChanged({
                     dataViews: [{
                         metadata: dataViewMetadata,
                         categorical: {
@@ -2821,6 +2845,7 @@ module powerbitests {
                         }
                     }],
                 });
+                v.onResizing({ height: 320, width: 640 });
 
                 setTimeout(() => {
                     let tickLabels = $('.lineChart .axisGraphicsContext .x.axis .tick text');
@@ -3753,7 +3778,7 @@ module powerbitests {
             expect(calculatedIndex).toBe(2);
         });
 
-        it('select column validation', () => {
+        xit('select column validation', () => {
             let lineChart = (<any>v).layers[0];
 
             spyOn(lineChart, 'setHoverLine').and.callThrough();;
@@ -4007,9 +4032,7 @@ module powerbitests {
 
         beforeEach(() => {
             element = powerbitests.helpers.testDom('150', '75');
-            v = powerbi.visuals.visualPluginFactory.createMinerva({
-                scrollableVisuals: true,
-            }).getPlugin('lineChart').create();
+            v = powerbi.visuals.visualPluginFactory.createMinerva({}).getPlugin('lineChart').create();
 
             v.init({
                 element: element,
@@ -4355,9 +4378,7 @@ module powerbitests {
 
         beforeEach(() => {
             element = powerbitests.helpers.testDom('150', '75');
-            v = powerbi.visuals.visualPluginFactory.createMinerva({
-                scrollableVisuals: true,
-            }).getPlugin('areaChart').create();
+            v = powerbi.visuals.visualPluginFactory.createMinerva({}).getPlugin('areaChart').create();
 
             v.init({
                 element: element,
@@ -4594,9 +4615,9 @@ module powerbitests {
 
             setTimeout(() => {
                 let pointX = 25;
-                let dataPoint = lineChart.data.series[0];
+                let seriesData = lineChart.data.series[0];
                 let svgPath = $('.interactivity-line')[0];
-                let tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint, svgPath), pointX);
+                let tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData, svgPath), pointX);
                 expect(tooltipInfo[0].displayName).toBe('col1');
                 expect(tooltipInfo[0].value).toBe('VW');
                 expect(tooltipInfo[1].displayName).toBe('col2');
@@ -4629,9 +4650,9 @@ module powerbitests {
 
             setTimeout(() => {
                 let pointX = 480; // test the last point to make sure we know how to skip that null value, defect 6546054
-                let dataPoint = lineChart.data.series[0];
+                let seriesData = lineChart.data.series[0];
                 let svgPath = $('.interactivity-line')[0];
-                let tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint, svgPath), pointX);
+                let tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData, svgPath), pointX);
                 expect(tooltipInfo[0].displayName).toBe('col3');
                 expect(tooltipInfo[0].value).toBe('07/15/2015');
                 expect(tooltipInfo[1].displayName).toBe('col2');
@@ -4703,20 +4724,20 @@ module powerbitests {
 
             lineChart = (<any>v).layers[0];
             let pointX: number = 10;
-            let dataPoint = lineChart.data.series[0];
-            let tooltipInfo: powerbi.visuals.TooltipDataItem[] = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            let seriesData = lineChart.data.series[0];
+            let tooltipInfo: powerbi.visuals.TooltipDataItem[] = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: '2001' }, { displayName: 'col2', value: '500000' }]);
 
             pointX = 120;
-            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: '2002' }, { displayName: 'col2', value: '495000' }]);
 
             pointX = 303;
-            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: '2004' }, { displayName: 'col2', value: '480000' }]);
 
             pointX = 450;
-            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: '2005' }, { displayName: 'col2', value: '500000' }]);
         });
 
@@ -4759,12 +4780,12 @@ module powerbitests {
 
             lineChart = (<any>v).layers[0];
             let pointX: number = 0;
-            let dataPoint = lineChart.data.series[0];
-            let tooltipInfo: powerbi.visuals.TooltipDataItem[] = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            let seriesData = lineChart.data.series[0];
+            let tooltipInfo: powerbi.visuals.TooltipDataItem[] = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: '2001' }, { displayName: 'col2', value: '500000' }]);
 
             pointX = 500;
-            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: '2005' }, { displayName: 'col2', value: '500000' }]);
         });
 
@@ -4829,20 +4850,20 @@ module powerbitests {
             });
 
             let pointX: number = 10;
-            let dataPoint = lineChart.data.series[0];
-            let tooltipInfo: powerbi.visuals.TooltipDataItem[] = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            let seriesData = lineChart.data.series[0];
+            let tooltipInfo: powerbi.visuals.TooltipDataItem[] = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: '2001' }, { displayName: 'col3', value: '(Blank)' }, { displayName: 'col2', value: '500000' }]);
 
             pointX = 120;
-            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: '2002' }, { displayName: 'col3', value: '(Blank)' }, { displayName: 'col2', value: '495000' }]);
 
             pointX = 303;
-            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: '2004' }, { displayName: 'col3', value: '(Blank)' }, { displayName: 'col2', value: '480000' }]);
 
             pointX = 450;
-            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: '2005' }, { displayName: 'col3', value: '(Blank)' }, { displayName: 'col2', value: '500000' }]);
         });
 
@@ -4883,20 +4904,20 @@ module powerbitests {
 
             lineChart = (<any>v).layers[0];
             let pointX: number = 10;
-            let dataPoint = lineChart.data.series[0];
-            let tooltipInfo: powerbi.visuals.TooltipDataItem[] = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            let seriesData = lineChart.data.series[0];
+            let tooltipInfo: powerbi.visuals.TooltipDataItem[] = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: 'a' }, { displayName: 'col2', value: '500000' }]);
 
             pointX = 120;
-            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: 'b' }, { displayName: 'col2', value: '495000' }]);
 
             pointX = 303;
-            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: 'd' }, { displayName: 'col2', value: '480000' }]);
 
             pointX = 450;
-            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(dataPoint), pointX);
+            tooltipInfo = lineChart.getTooltipInfoByPathPointX(createTooltipEvent(seriesData), pointX);
             expect(tooltipInfo).toEqual([{ displayName: 'col1', value: 'e' }, { displayName: 'col2', value: '500000' }]);
         });
     });
@@ -4908,7 +4929,6 @@ module powerbitests {
         beforeEach(() => {
             element = powerbitests.helpers.testDom('150', '75');
             v = powerbi.visuals.visualPluginFactory.createMinerva({
-                scrollableVisuals: true,
                 lineChartLabelDensityEnabled: true,
             }).getPlugin('lineChart').create();
 
@@ -5602,6 +5622,10 @@ module powerbitests {
     function callCreateLabelDataPoints(v: powerbi.IVisual): powerbi.LabelDataPoint[] {
         let labelDataPointsGroups = (<any>v).layers[0].createLabelDataPoints();
         return labelDataPointsGroups[0].labelDataPoints;
+    }
+
+    function callCreateLabelDataPointsObj(v: powerbi.IVisual): powerbi.LabelDataPointsGroup[] {
+        return (<any>v).layers[0].createLabelDataPoints();
     }
 
     function createTooltipEvent(data: any, context?: HTMLElement): powerbi.visuals.TooltipEvent {

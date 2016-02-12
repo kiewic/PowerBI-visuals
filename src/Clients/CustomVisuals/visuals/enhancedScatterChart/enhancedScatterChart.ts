@@ -24,10 +24,9 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../../_references.ts" />
-
 module powerbi.visuals.samples {
     import ClassAndSelector = jsCommon.CssConstants.ClassAndSelector;
+    import DataRoleHelper = powerbi.data.DataRoleHelper;
 
     interface ScatterChartMeasureMetadata {
         idx: {
@@ -146,7 +145,6 @@ module powerbi.visuals.samples {
         private colors: IDataColorPalette;
         private options: VisualInitOptions;
         private interactivity: InteractivityOptions;
-        private isInteractiveChart: boolean;
         private interactivityService: IInteractivityService;
         private categoryAxisProperties: DataViewObject;
         private valueAxisProperties: DataViewObject;
@@ -658,7 +656,6 @@ module powerbi.visuals.samples {
             this.hostServices = options.host;
             this.colors = this.style.colorPalette.dataColors;
             this.interactivity = options.interactivity;
-            this.isInteractiveChart = options.interactivity && options.interactivity.isInteractiveLegend;
             this.margin = {
                 top: 1,
                 right: 1,
@@ -701,7 +698,7 @@ module powerbi.visuals.samples {
             this.y1AxisGraphicsContext.classed('hideLinesOnAxis', !showLinesOnY);
             this.interactivityService = createInteractivityService(this.hostServices);
 
-            this.legend = createLegend(element, this.isInteractiveChart, this.interactivityService, true);
+            this.legend = createLegend(element, this.interactivity && this.interactivity.isInteractiveLegend, this.interactivityService, true);
 
             this.mainGraphicsG = this.axisGraphicsContextScrollable.append('g')
                 .classed(EnhancedScatterChart.MainGraphicsContextClassName, true);
@@ -781,7 +778,8 @@ module powerbi.visuals.samples {
                         start: categoryAxisObject['start'],
                         end: categoryAxisObject['end'],
                         showAxisTitle: categoryAxisObject['showAxisTitle'] == null ? axisTitleOnByDefault : categoryAxisObject['showAxisTitle'],
-                        axisStyle: categoryAxisObject['axisStyle']
+                        axisStyle: categoryAxisObject['axisStyle'],
+                        labelDisplayUnits: categoryAxisObject['labelDisplayUnits']
                     };
                 }
             }
@@ -1350,7 +1348,7 @@ module powerbi.visuals.samples {
                 this.populateObjectProperties(dataViews);
             }
 
-            this.setData(options.dataViews);
+            this.setData(dataViews);
             
             // Note: interactive legend shouldn't be rendered explicitly here
             // The interactive legend is being rendered in the render method of ICartesianVisual
@@ -1381,6 +1379,7 @@ module powerbi.visuals.samples {
 
         private renderLegend(): void {
             let legendData: LegendData = { title: "", dataPoints: [] };
+            let legend: ILegend = this.legend;
 
             this.layerLegendData = this.data.legendData;
             if (this.layerLegendData) {
@@ -1399,17 +1398,19 @@ module powerbi.visuals.samples {
                 let position = <string>legendProperties[legendProps.position];
 
                 if (position)
-                    this.legend.changeOrientation(LegendPosition[position]);
+                    legend.changeOrientation(LegendPosition[position]);
             }
             else {
-                this.legend.changeOrientation(LegendPosition.Top);
+                legend.changeOrientation(LegendPosition.Top);
             }
 
             if ((legendData.dataPoints.length === 1 && !legendData.grouped) || this.hideLegends()) {
                 legendData.dataPoints = [];
             }
-
-            this.legend.drawLegend(legendData, this.viewport);
+            
+            let viewport = this.viewport;
+            legend.drawLegend(legendData, { height: viewport.height, width: viewport.width });
+            Legend.positionChartArea(this.svg, legend);
         }
         private hideLegends(): boolean {
             if (this.cartesianSmallViewPortProperties) {
@@ -1632,9 +1633,6 @@ module powerbi.visuals.samples {
             let data = this.data;
             let dataPoints = this.data.dataPoints;
 
-            let xScale = this.xAxisProperties.scale;
-            let yScale = this.yAxisProperties.scale;
-
             let hasSelection = this.interactivityService && this.interactivityService.hasSelection();
 
             this.mainGraphicsContext.attr('width', this.viewportIn.width)
@@ -1649,7 +1647,7 @@ module powerbi.visuals.samples {
 
             let dataLabelsSettings = this.data.dataLabelsSettings;
             if (dataLabelsSettings.show) {
-                let layout = this.getEnhanchedScatterChartLabelLayout(xScale, yScale, dataLabelsSettings, this.viewportIn, data.sizeRange);
+                let layout = this.getEnhanchedScatterChartLabelLayout(dataLabelsSettings, this.viewportIn, data.sizeRange);
                 dataLabelUtils.drawDefaultLabelsForDataPointChart(dataPoints, this.mainGraphicsG, layout, this.viewportIn, !suppressAnimations, duration);
             }
             else {
@@ -1699,12 +1697,14 @@ module powerbi.visuals.samples {
             return { solid: { color: '#333' } };
         }
 
-        private getEnhanchedScatterChartLabelLayout(xScale: D3.Scale.GenericScale<any>,
-            yScale: D3.Scale.GenericScale<any>,
-            labelSettings: PointDataLabelsSettings,
+        private getEnhanchedScatterChartLabelLayout(labelSettings: PointDataLabelsSettings,
             viewport: IViewport,
             sizeRange: NumberRange): ILabelLayout {
+
+            let xScale = this.xAxisProperties.scale;
+            let yScale = this.yAxisProperties.scale;
             let fontSizeInPx = jsCommon.PixelConverter.fromPoint(labelSettings.fontSize);
+
             return {
                 labelText: function (d) {
                     return dataLabelUtils.getLabelFormattedText({
@@ -1728,6 +1728,16 @@ module powerbi.visuals.samples {
                     'font-size': fontSizeInPx,
                 },
             };
+        }
+
+        private getValueAxisFill(): Fill {
+            if (this.dataView && this.dataView.metadata.objects) {
+                let label = this.dataView.metadata.objects['valueAxis'];
+                if (label)
+                    return <Fill>label['axisColor'];
+            }
+
+            return { solid: { color: '#333' } };
         }
 
         private renderCrossHair() {
@@ -1809,10 +1819,10 @@ module powerbi.visuals.samples {
                 })
                     .on("mouseover", function () {
                         d3.selectAll(".crosshair").style("display", "block");
-                })
+                    })
                     .on("mouseout", function () {
                         d3.selectAll(".crosshair").style("display", "none");
-                });
+                    });
             }
         }
 
@@ -1866,6 +1876,12 @@ module powerbi.visuals.samples {
                     xAxisGraphicsElement
                         .call(xAxis.axis)
                         .call(this.darkenZeroLine);
+                }
+                let xZeroTick = xAxisGraphicsElement.selectAll('g.tick').filter((data) => data === 0);
+                if (xZeroTick) {
+                    let xZeroColor = this.getValueAxisFill();
+                    if (xZeroColor)
+                        xZeroTick.selectAll('line').style({ 'stroke': xZeroColor.solid.color });
                 }
 
                 let xAxisTextNodes = xAxisGraphicsElement.selectAll('text');
@@ -1963,14 +1979,14 @@ module powerbi.visuals.samples {
                     .style("text-anchor", "middle")
                     .text(axisLabels.x)
                     .call((text: D3.Selection) => {
-                    text.each(function () {
-                        let text = d3.select(this);
-                        text.attr({
-                            "class": "xAxisLabel",
-                            "transform": SVGUtil.translate(width / 2, height - fontSize - 2)
+                        text.each(function () {
+                            let text = d3.select(this);
+                            text.attr({
+                                "class": "xAxisLabel",
+                                "transform": SVGUtil.translate(width / 2, height - fontSize - 2)
+                            });
                         });
                     });
-                });
 
                 xAxisLabel.call(AxisHelper.LabelLayoutStrategy.clip,
                     width,
@@ -1982,17 +1998,17 @@ module powerbi.visuals.samples {
                     .style("text-anchor", "middle")
                     .text(axisLabels.y)
                     .call((text: D3.Selection) => {
-                    text.each(function () {
-                        let text = d3.select(this);
-                        text.attr({
-                            "class": "yAxisLabel",
-                            "transform": "rotate(-90)",
-                            "y": showY1OnRight ? width + margin.right - fontSize : -margin.left,
-                            "x": -((height - margin.top - legendMargin) / 2),
-                            "dy": "1em"
+                        text.each(function () {
+                            let text = d3.select(this);
+                            text.attr({
+                                "class": "yAxisLabel",
+                                "transform": "rotate(-90)",
+                                "y": showY1OnRight ? width + margin.right - fontSize : -margin.left,
+                                "x": -((height - margin.top - legendMargin) / 2),
+                                "dy": "1em"
+                            });
                         });
                     });
-                });
 
                 yAxisLabel.call(AxisHelper.LabelLayoutStrategy.clip,
                     height - (margin.bottom + margin.top),
@@ -2004,17 +2020,17 @@ module powerbi.visuals.samples {
                     .style("text-anchor", "middle")
                     .text(axisLabels.y2)
                     .call((text: D3.Selection) => {
-                    text.each(function () {
-                        let text = d3.select(this);
-                        text.attr({
-                            "class": "yAxisLabel",
-                            "transform": "rotate(-90)",
-                            "y": showY1OnRight ? -margin.left : width + margin.right - fontSize,
-                            "x": -((height - margin.top - legendMargin) / 2),
-                            "dy": "1em"
+                        text.each(function () {
+                            let text = d3.select(this);
+                            text.attr({
+                                "class": "yAxisLabel",
+                                "transform": "rotate(-90)",
+                                "y": showY1OnRight ? -margin.left : width + margin.right - fontSize,
+                                "x": -((height - margin.top - legendMargin) / 2),
+                                "dy": "1em"
+                            });
                         });
                     });
-                });
 
                 y2AxisLabel.call(AxisHelper.LabelLayoutStrategy.clip,
                     height - (margin.bottom + margin.top),
@@ -2132,70 +2148,70 @@ module powerbi.visuals.samples {
             let useCustomColor = this.data.useCustomColor;
             if (this.data.useShape) {
                 this.mainGraphicsContext.selectAll(EnhancedScatterChart.ImageClasses.selector).remove();
-                markers = this.mainGraphicsContext.selectAll(EnhancedScatterChart.DotClasses.selector).data(scatterData,(d: EnhancedScatterChartDataPoint) => d.identity.getKey());
+                markers = this.mainGraphicsContext.classed('ScatterMarkers', true).selectAll(EnhancedScatterChart.DotClasses.selector).data(scatterData, (d: EnhancedScatterChartDataPoint) => d.identity.getKey());
                 markers.enter()
                     .append('path')
                     .classed(EnhancedScatterChart.DotClasses.class, true).attr('id', 'markershape');
                 markers
                     .style({
-                    'stroke-opacity': (d: EnhancedScatterChartDataPoint) => ScatterChart.getBubbleOpacity(d, hasSelection),
-                    'stroke-width': '1px',
-                    'stroke': (d: EnhancedScatterChartDataPoint) => {
-                        let color = useCustomColor ? d.colorFill : d.fill;
-                        if (this.data.outline) {
-                            return d3.rgb(color).darker();
-                        } else {
-                            return d3.rgb(color);
-                        }
-                    },
-                    'fill': (d: EnhancedScatterChartDataPoint) => d3.rgb(useCustomColor ? d.colorFill : d.fill),
-                    'fill-opacity': (d: EnhancedScatterChartDataPoint) => (d.size != null || shouldEnableFill) ? ScatterChart.getBubbleOpacity(d, hasSelection) : 0,
-                })
+                        'stroke-opacity': (d: EnhancedScatterChartDataPoint) => ScatterChart.getBubbleOpacity(d, hasSelection),
+                        'stroke-width': '1px',
+                        'stroke': (d: EnhancedScatterChartDataPoint) => {
+                            let color = useCustomColor ? d.colorFill : d.fill;
+                            if (this.data.outline) {
+                                return d3.rgb(color).darker();
+                            } else {
+                                return d3.rgb(color);
+                            }
+                        },
+                        'fill': (d: EnhancedScatterChartDataPoint) => d3.rgb(useCustomColor ? d.colorFill : d.fill),
+                        'fill-opacity': (d: EnhancedScatterChartDataPoint) => (d.size != null || shouldEnableFill) ? ScatterChart.getBubbleOpacity(d, hasSelection) : 0,
+                    })
                     .attr("d", (d: EnhancedScatterChartDataPoint) => {
                         let r = ScatterChart.getBubbleRadius(d.radius, sizeRange, this.viewport);
                         let area = 4 * r * r;
-                    return d.shapeSymbolType(area);
-                })
+                        return d.shapeSymbolType(area);
+                    })
                     .transition()
                     .duration((d) => {
-                    if (this.keyArray.indexOf(d.identity.getKey()) >= 0) {
-                        return duration;
-                    } else {
-                        return 0;
-                    }
-                })
+                        if (this.keyArray.indexOf(d.identity.getKey()) >= 0) {
+                            return duration;
+                        } else {
+                            return 0;
+                        }
+                    })
                     .attr("transform", function (d) { return "translate(" + xScale(d.x) + "," + yScale(d.y) + ") rotate(" + d.rotation + ")"; });
             } else {
                 this.mainGraphicsContext.selectAll(EnhancedScatterChart.DotClasses.selector).remove();
-                markers = this.mainGraphicsContext.selectAll(EnhancedScatterChart.ImageClasses.selector).data(scatterData, (d: EnhancedScatterChartDataPoint) => d.identity.getKey());
+                markers = this.mainGraphicsContext.classed('ScatterMarkers', true).selectAll(EnhancedScatterChart.ImageClasses.selector).data(scatterData, (d: EnhancedScatterChartDataPoint) => d.identity.getKey());
                 markers.enter().append("svg:image")
                     .classed(EnhancedScatterChart.ImageClasses.class, true).attr('id', 'markerimage');
                 markers
                     .attr("xlink:href", (d) => {
-                    if (d.svgurl !== undefined && d.svgurl != null && d.svgurl !== "") {
-                        return d.svgurl;
-                    } else {
-                        return this.svgDefaultImage;
-                    }
-                })
+                        if (d.svgurl !== undefined && d.svgurl != null && d.svgurl !== "") {
+                            return d.svgurl;
+                        } else {
+                            return this.svgDefaultImage;
+                        }
+                    })
                     .attr("width", (d) => {
-                    return ScatterChart.getBubbleRadius(d.radius, sizeRange, this.viewport) * 2;
-                })
+                        return ScatterChart.getBubbleRadius(d.radius, sizeRange, this.viewport) * 2;
+                    })
                     .attr("height", (d) => {
-                    return ScatterChart.getBubbleRadius(d.radius, sizeRange, this.viewport) * 2;
-                })
+                        return ScatterChart.getBubbleRadius(d.radius, sizeRange, this.viewport) * 2;
+                    })
                     .transition()
                     .duration((d) => {
-                    if (this.keyArray.indexOf(d.identity.getKey()) >= 0) {
-                        return duration;
-                    } else {
-                        return 0;
-                    }
-                })
+                        if (this.keyArray.indexOf(d.identity.getKey()) >= 0) {
+                            return duration;
+                        } else {
+                            return 0;
+                        }
+                    })
                     .attr("transform", (d) => {
-                    let radius = ScatterChart.getBubbleRadius(d.radius, sizeRange, this.viewport);
-                    return "translate(" + (xScale(d.x) - radius) + "," + (yScale(d.y) - radius) + ") rotate(" + d.rotation + "," + radius + "," + radius + ")";
-                });
+                        let radius = ScatterChart.getBubbleRadius(d.radius, sizeRange, this.viewport);
+                        return "translate(" + (xScale(d.x) - radius) + "," + (yScale(d.y) - radius) + ") rotate(" + d.rotation + "," + radius + "," + radius + ")";
+                    });
             }
 
             markers.exit().remove();
@@ -2498,16 +2514,16 @@ module powerbi.visuals.samples {
             enumeration
                 .pushInstance(instance)
                 .pushInstance({
-                selector: null,
-                properties: {
-                    axisStyle: this.categoryAxisProperties && this.categoryAxisProperties['axisStyle'] ? this.categoryAxisProperties['axisStyle'] : axisStyle.showTitleOnly,
-                    labelColor: this.categoryAxisProperties ? this.categoryAxisProperties['labelColor'] : null
-                },
-                objectName: 'categoryAxis',
-                validValues: {
-                    axisStyle: this.categoryAxisHasUnitType ? [axisStyle.showTitleOnly, axisStyle.showUnitOnly, axisStyle.showBoth] : [axisStyle.showTitleOnly]
-                }
-            });
+                    selector: null,
+                    properties: {
+                        axisStyle: this.categoryAxisProperties && this.categoryAxisProperties['axisStyle'] ? this.categoryAxisProperties['axisStyle'] : axisStyle.showTitleOnly,
+                        labelColor: this.categoryAxisProperties ? this.categoryAxisProperties['labelColor'] : null
+                    },
+                    objectName: 'categoryAxis',
+                    validValues: {
+                        axisStyle: this.categoryAxisHasUnitType ? [axisStyle.showTitleOnly, axisStyle.showUnitOnly, axisStyle.showBoth] : [axisStyle.showTitleOnly]
+                    }
+                });
         }
 
         //todo: wrap all these object getters and other related stuff into an interface
@@ -2539,16 +2555,16 @@ module powerbi.visuals.samples {
             enumeration
                 .pushInstance(instance)
                 .pushInstance({
-                selector: null,
-                properties: {
-                    axisStyle: this.valueAxisProperties && this.valueAxisProperties['axisStyle'] != null ? this.valueAxisProperties['axisStyle'] : axisStyle.showTitleOnly,
-                    labelColor: this.valueAxisProperties ? this.valueAxisProperties['labelColor'] : null
-                },
-                objectName: 'valueAxis',
-                validValues: {
-                    axisStyle: this.valueAxisHasUnitType ? [axisStyle.showTitleOnly, axisStyle.showUnitOnly, axisStyle.showBoth] : [axisStyle.showTitleOnly]
-                },
-            });
+                    selector: null,
+                    properties: {
+                        axisStyle: this.valueAxisProperties && this.valueAxisProperties['axisStyle'] != null ? this.valueAxisProperties['axisStyle'] : axisStyle.showTitleOnly,
+                        labelColor: this.valueAxisProperties ? this.valueAxisProperties['labelColor'] : null
+                    },
+                    objectName: 'valueAxis',
+                    validValues: {
+                        axisStyle: this.valueAxisHasUnitType ? [axisStyle.showTitleOnly, axisStyle.showUnitOnly, axisStyle.showBoth] : [axisStyle.showTitleOnly]
+                    },
+                });
         }
 
         public onClearSelection(): void {

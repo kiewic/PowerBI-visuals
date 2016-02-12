@@ -23,11 +23,14 @@
  *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  *  THE SOFTWARE.
  */
+
 var gulp = require("gulp"),
+    gutil = require("gulp-util"),
     fs = require("fs"),
     download = require("gulp-download"),
     os = require("os"),
-    exec = require("child_process").execSync,
+    shelljs = require("shelljs"),
+    path = require("path"),
     unzip = require("gulp-unzip"),
     visualsCommon = require("./visualsCommon.js");
 
@@ -36,31 +39,39 @@ module.exports = {
     installPhantomjs: installPhantomjs,
 };
     
-/** --------------------------Download "JASMINE-jquery.js" --------------------------------*/
+/**
+ *  Download JasmineJQuery 
+ */
 function installJasmine() {
-    var result = null;
-    var exists = fs.existsSync("src/Clients/Externals/ThirdPartyIP/JasmineJQuery/jasmine-jquery.js");
+    var result = null,
+        jasmineLib = "jasmine-jquery.js",
+        jasminePath = path.join(__dirname, "../src/Clients/Externals/ThirdPartyIP/JasmineJQuery/"),
+        jasmineLibPath = path.join(jasminePath, jasmineLib),
+        exists = fs.existsSync(jasmineLibPath),
+        jasmineURL = "https://raw.githubusercontent.com/velesin/jasmine-jquery/6abe7e3a329c4332067db9d69b0cca43a605ff46/lib/jasmine-jquery.js";
+
     if (!exists) {
-        console.log("Jasmine test dependency missing. Downloading dependency.");
-        result = download("https://raw.github.com/velesin/jasmine-jquery/master/lib/jasmine-jquery.js")
-            .pipe(gulp.dest("src/Clients/Externals/ThirdPartyIP/JasmineJQuery"));
+        gutil.log("JasmineJQuery missing. Downloading dependency...");
+        result = download(jasmineURL).pipe(gulp.dest(jasminePath));
     } else {
-        console.log("Jasmine test dependency exists.");
+        gutil.log("JasmineJQuery lib already exists.");
     }
     return result;
 }
 
-/** ------------------------------ Download PHANTOM --------------------------------------- */
+/**
+ *  Download phantomjs 
+ */
 function installPhantomjs() {
     var zipUrl = "https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-2.0.0-windows.zip";
     var phantomExe = "phantomjs.exe";
-    var jasmineBrowserDir = "./node_modules/gulp-jasmine-browser/lib/";
+    var jasmineBrowserDir = path.resolve(__dirname, "../node_modules/gulp-jasmine-browser/lib/");
 
     // Download phantomjs only for Windows OS.
     var version = getPhantomJsVersion(jasmineBrowserDir);
     if (os.type().search("Windows") !== -1) {
         if (!version) {
-            console.log("Phantomjs missing. Downloading dependency.");
+            gutil.log("Phantomjs missing. Downloading dependency...");
             return download(zipUrl)
                 .pipe(unzip({
                     filter: function (entry) {
@@ -77,18 +88,22 @@ function installPhantomjs() {
         if (version) {
             logIfExists(version);
         } else {
-            console.log("Automatic installation does not allowed for current OS [" + os.type() + "]. Please install Phantomjs manually. (https://bitbucket.org/ariya/phantomjs)");
+            gutil.log("Automatic installation does not allowed for current OS [" + os.type() + "]. Please install Phantomjs manually. (https://bitbucket.org/ariya/phantomjs)");
         }
     }
 
     function logIfExists(version) {
-        console.log("Phantomjs has already exist. [Version: " + version + "]");
+        gutil.log("Phantomjs already exists. [Version: " + version + "]");
     }
 
     function getPhantomJsVersion(path) {
         try {
-            var stdout = exec("phantomjs -v", { cwd: path }).toString();
-            return stdout.substring(0, 5);
+            shelljs.cd(path);
+            var stdout = shelljs.exec("phantomjs -v", {
+                silent: true
+            });
+            shelljs.cd(__dirname);
+            return (stdout.code === 0) ? stdout.output.substring(0, 5) : null;
         }
         catch (e) {
             return null;

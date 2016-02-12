@@ -24,7 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
+
 
 module powerbitests {
     import ILegend = powerbi.visuals.ILegend;
@@ -301,18 +301,22 @@ module powerbitests {
             powerbi.visuals.SVGUtil.flushAllD3Transitions();
             let lenOfLegendOnDom = $('.legendItem title').length;
             for (let i = 0; i < lenOfLegendOnDom; i++) {
-                expect($('.legendItem title').eq(i).text()).toBe(legendData[i].tooltip);
+                expect($('.legendItem title').eq(i).text()).toBe(legendData[i].label);
             }
         });
 
         it('legend truncated items tooltip', () => {
             let legendData = getLotsOfLegendData();
-            legend.drawLegend({ dataPoints: legendData, title: 'states' }, viewport);
+            let originalOrientation = legend.getOrientation();
+            legend.changeOrientation(LegendPosition.Left);
+            legend.drawLegend({ dataPoints: legendData, title: 'states' }, { height: 500, width: 150 });
             powerbi.visuals.SVGUtil.flushAllD3Transitions();
             let lenOfLegendOnDom = $('.legendItem title').length;
             for (let i = 0; i < lenOfLegendOnDom; i++) {
-                expect($('.legendItem title').eq(i).text()).toBe(legendData[i].tooltip);
+                let legendItemText = $('.legendItem title').eq(i).text();
+                expect(legendItemText).toBe(legendData[i].label);
             }
+            legend.changeOrientation(originalOrientation);
         });
 
         xit('legend with long title on Right', () => {
@@ -393,7 +397,7 @@ module powerbitests {
             legend.changeOrientation(LegendPosition.Top);
             legend.drawLegend({ dataPoints: legendData, fontSize: 8 }, { height: 100, width: 1000 });
             powerbi.visuals.SVGUtil.flushAllD3Transitions();
-            expect($('.legendItem').length).toBeLessThan(28);
+            expect($('.legendItem').length).toBeLessThan(33);
             expect($('.legendItem').length).toBeGreaterThan(20);
         });
 
@@ -524,7 +528,7 @@ module powerbitests {
         it('Intelligent Layout: Second arrow appears when you page right', () => {
             let legendData = getLotsOfLegendData();
             legend.changeOrientation(LegendPosition.Top);
-            legend.drawLegend({ dataPoints: legendData }, { height: 100, width: 1000 });
+            legend.drawLegend({ dataPoints: legendData }, { height: 100, width: 900 });
             powerbi.visuals.SVGUtil.flushAllD3Transitions();
             expect($('.navArrow').length).toBe(1);
             (<any>$('.navArrow').first()).d3Click(0, 0);
@@ -544,7 +548,7 @@ module powerbitests {
         it('Intelligent Layout: Second arrow disappears when you page rigth to last page', () => {
             let legendData = getLotsOfLegendData();
             legend.changeOrientation(LegendPosition.Top);
-            legend.drawLegend({ dataPoints: legendData, fontSize: 8 }, { height: 100, width: 1000 });
+            legend.drawLegend({ dataPoints: legendData, fontSize: 8 }, { height: 100, width: 900 });
             powerbi.visuals.SVGUtil.flushAllD3Transitions();
             expect($('.navArrow').length).toBe(1);
             (<any>$('.navArrow').first()).d3Click(0, 0);
@@ -565,6 +569,57 @@ module powerbitests {
             expect($('.navArrow').length).toBe(1);
         });
 
+        it('Intelligent Layout: Both arrows are Horizontally Centered', () => {
+            let legendData = getLotsOfLegendData();
+            legend.changeOrientation(LegendPosition.Top);
+            legend.drawLegend({ fontSize: 40, dataPoints: legendData }, { height: 500, width: 1000 });
+            powerbi.visuals.SVGUtil.flushAllD3Transitions();
+            (<any>$('.navArrow').first()).d3Click(0, 0);
+            let firstArrowPosition = getPosition($('.navArrow').first()[0]);
+            let firstArrowY = firstArrowPosition.top;
+            let firstArrowHeight = firstArrowPosition.height;
+            let lastArrowPosition = getPosition($('.navArrow').last()[0]);
+            let lastArrowY = lastArrowPosition.top;
+            let lastArrowHeight = lastArrowPosition.height;
+            let labelPosition = getPosition($('.legendText').first()[0]);
+            let labelY = labelPosition.top;
+            let labelHeight = labelPosition.height;
+            expect(firstArrowY + firstArrowHeight / 2).toBeGreaterThan((labelY * 2 + labelHeight) * 0.4);
+            expect(firstArrowY + firstArrowHeight / 2).toBeLessThan((labelY * 2 + labelHeight) * 0.6);
+            expect(lastArrowY + lastArrowHeight / 2).toBeGreaterThan((labelY * 2 + labelHeight) * 0.4);
+            expect(lastArrowY + lastArrowHeight / 2).toBeLessThan((labelY * 2 + labelHeight) * 0.6);
+        });
+
+        it('Intelligent Layout: Icon Horizontally Centered', () => {
+            let legendData = getLotsOfLegendData();
+            legend.changeOrientation(LegendPosition.Top);
+            legend.drawLegend({ fontSize: 40, dataPoints: legendData }, { height: 500, width: 1000 });
+            powerbi.visuals.SVGUtil.flushAllD3Transitions();
+            let iconPosition = getPosition($('.legendIcon').first()[0]);
+            let labelPosition = getPosition($('.legendText').first()[0]);
+            let iconY = iconPosition.top;
+            let iconHeight = iconPosition.height;
+            let labelY = labelPosition.top;
+            let labelHeight = labelPosition.height;
+            expect(iconY + iconHeight / 2).toBeGreaterThan((labelY * 2 + labelHeight) * 0.4);
+            expect(iconY + iconHeight / 2).toBeLessThan((labelY * 2 + labelHeight) * 0.6);
+        });
+
+        it('Intelligent Layout: Icon Vertically Centered', () => {
+            let legendData = getLotsOfLegendData();
+            legend.changeOrientation(LegendPosition.Left);
+            legend.drawLegend({ fontSize: 40, dataPoints: legendData }, { height: 500, width: 1000 });
+            powerbi.visuals.SVGUtil.flushAllD3Transitions();
+            let iconPosition = getPosition($('.legendIcon').first()[0]);
+            let labelPosition = getPosition($('.legendText').first()[0]);
+            let iconY = iconPosition.top;
+            let iconHeight = iconPosition.height;
+            let labelY = labelPosition.top;
+            let labelHeight = labelPosition.height;
+            expect(iconY + iconHeight / 2).toBeGreaterThan((labelY * 2 + labelHeight) * 0.4);
+            expect(iconY + iconHeight / 2).toBeLessThan((labelY * 2 + labelHeight) * 0.6);
+        });
+
         function validateLegendDOM(expectedData: powerbi.visuals.LegendDataPoint[]): void {
             let len = expectedData.length;
             let labels = $('.legendText');
@@ -578,6 +633,11 @@ module powerbitests {
                 expect($(labels.get(i)).text()).toBe(expectedDatum.label);
                 helpers.assertColorsMatch(icons.eq(i).css('fill'), expectedDatum.color);
             }
+        }
+
+        function getPosition(element: HTMLElement): powerbi.visuals.Rect {
+            let rect = element.getBoundingClientRect();
+            return { left: rect.left, top: rect.top, height: rect.height, width: rect.width };
         }
     });
 

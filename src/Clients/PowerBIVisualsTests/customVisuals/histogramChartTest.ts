@@ -24,7 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
+
 
 module powerbitests.customVisuals {
     import VisualClass = powerbi.visuals.samples.Histogram;
@@ -40,7 +40,7 @@ module powerbitests.customVisuals {
 
             beforeEach(() => {
                 visualBuilder = new HistogramChartBuilder();
-                dataViews = [powerbitests.customVisuals.sampleDataViews.valueByAgeData()];
+                dataViews = [new powerbitests.customVisuals.sampleDataViews.ValueByAgeData().getDataView()];
             });
 
             it("svg element created", () => expect(visualBuilder.mainElement[0]).toBeInDOM());

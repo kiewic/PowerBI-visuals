@@ -24,7 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
+
 
 module powerbitests.customVisuals {
     import VisualClass = powerbi.visuals.samples.AsterPlot;
@@ -40,7 +40,7 @@ module powerbitests.customVisuals {
 
             beforeEach(() => {
                 visualBuilder = new AsterPlotBuilder();
-                dataViews = [powerbitests.customVisuals.sampleDataViews.salesByDayOfWeekData()];
+                dataViews = [new powerbitests.customVisuals.sampleDataViews.SalesByDayOfWeekData().getDataView()];
             });
 
             it("svg element created", () => expect(visualBuilder.mainElement[0]).toBeInDOM());

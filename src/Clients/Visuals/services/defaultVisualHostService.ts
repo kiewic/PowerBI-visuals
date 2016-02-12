@@ -154,15 +154,17 @@ module powerbi.visuals {
         public shouldRetainSelection(): boolean { return false; }
         public geocoder(): IGeocoder { return services.createGeocoder(); }
         public promiseFactory(): IPromiseFactory { return createJQueryPromiseFactory(); }
-        public analyzedFilter(options: FilterAnalyzerOptions): AnalyzedFilter {
+        public analyzeFilter(options: FilterAnalyzerOptions): AnalyzedFilter {
             return {
                 isNotFilter: false,
                 selectedIdentities: [],
-                hasDefaultFilterOverride: () => false,
                 filter: undefined,
                 defaultValue: undefined,
             };
         }
+        public getIdentityDisplayNames(dentities: DataViewScopeIdentity[]): DisplayNameIdentityPair[] { return; }        
+        public setIdentityDisplayNames(displayNamesIdentityPairs: DisplayNameIdentityPair[]): void { }
+
         private static beautify(format: string): string {
             let key = BeautifiedFormat[format];
             if (key)

@@ -24,7 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
+
 
 module powerbitests.customVisuals {
     import VisualClass = powerbi.visuals.samples.DotPlot;
@@ -35,12 +35,12 @@ module powerbitests.customVisuals {
         });
 
         describe("DOM tests", () => {
-            let visualBuilder: BulletChartBuilder;
+            let visualBuilder: DotPlotBuilder;
             let dataViews: powerbi.DataView[];
 
             beforeEach(() => {
-                visualBuilder = new BulletChartBuilder();
-                dataViews = [powerbitests.customVisuals.sampleDataViews.dotPlotData()];
+                visualBuilder = new DotPlotBuilder();
+                dataViews = [new powerbitests.customVisuals.sampleDataViews.DotPlotData().getDataView()];
             });
 
             it("svg element created", () =>expect(visualBuilder.mainElement[0]).toBeInDOM());
@@ -58,7 +58,7 @@ module powerbitests.customVisuals {
         });
     });
 
-    class BulletChartBuilder extends VisualBuilderBase<VisualClass> {
+    class DotPlotBuilder extends VisualBuilderBase<VisualClass> {
         constructor(height: number = 200, width: number = 300, isMinervaVisualPlugin: boolean = false) {
             super(height, width, isMinervaVisualPlugin);
             this.build();

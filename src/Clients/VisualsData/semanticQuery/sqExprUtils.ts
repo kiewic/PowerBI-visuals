@@ -221,6 +221,9 @@ module powerbi.data {
                 return;
 
             let sqField = SQExprConverter.asFieldPattern(fieldSQExpr);
+            if (!sqField)
+                return;
+
             let column: FieldExprPropertyPattern = sqField.column;
 
             if (column) {
@@ -345,7 +348,7 @@ module powerbi.data {
             public static instance: IsDefaultValueVisitor = new IsDefaultValueVisitor();
 
             public visitCompare(expr: SQCompareExpr): boolean {
-                if (expr.kind !== QueryComparisonKind.Equal)
+                if (expr.comparison !== QueryComparisonKind.Equal)
                     return false;
 
                 return expr.right.accept(this);
@@ -368,7 +371,7 @@ module powerbi.data {
             public static instance: IsAnyValueVisitor = new IsAnyValueVisitor();
 
             public visitCompare(expr: SQCompareExpr): boolean {
-                if (expr.kind !== QueryComparisonKind.Equal)
+                if (expr.comparison !== QueryComparisonKind.Equal)
                     return false;
 
                 return expr.right.accept(this);

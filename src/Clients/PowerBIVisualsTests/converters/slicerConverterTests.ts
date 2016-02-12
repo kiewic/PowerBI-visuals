@@ -24,7 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
+
 
 module powerbitests {
     import data = powerbi.data;
@@ -60,7 +60,7 @@ module powerbitests {
         });
 
         it("one retained value exists in dataView, the other does not", () => {
-            let hostServices = slicerHelper.createHostServices();;
+            let hostServices = slicerHelper.createHostServices();
             let interactivityService = powerbi.visuals.createInteractivityService(hostServices);
             let semanticFilter: data.SemanticFilter = data.SemanticFilter.fromSQExpr(
                 SQExprBuilder.or(
@@ -129,6 +129,22 @@ module powerbitests {
             allItemsSelectedSlicerTestHelper(interactivityService, hostServices, false, false, true);
             expect(interactivityService.isSelectionModeInverted()).toBe(true);
         });
+
+        it("calling host to get display label", () => {
+            let hostServices = slicerHelper.createHostServices();
+            let interactivityService = powerbi.visuals.createInteractivityService(hostServices);
+            let semanticFilter: data.SemanticFilter = data.SemanticFilter.fromSQExpr(
+                SQExprBuilder.or(
+                    SQExprBuilder.compare(data.QueryComparisonKind.Equal, field, SQExprBuilder.text('Grapes')),
+                    SQExprBuilder.compare(data.QueryComparisonKind.Equal, field, SQExprBuilder.text('retainedValue'))));
+            let dataView = applyDataTransform(slicerHelper.buildDefaultDataView(field), semanticFilter);
+            let spyOnGetLabelForScopeId = <any> spyOn(hostServices, "getIdentityDisplayNames").and.callThrough();
+            let spyOnSetLabelForScopeId = <any> spyOn(hostServices, "setIdentityDisplayNames").and.callThrough();
+            let slicerData = powerbi.visuals.DataConversion.convert(dataView[0], slicerHelper.SelectAllTextKey, interactivityService, hostServices);
+            expect((<jasmine.Spy> spyOnGetLabelForScopeId).calls.count()).toBe(1);
+            expect((<jasmine.Spy> spyOnSetLabelForScopeId).calls.count()).toBe(1);
+        });
+
 
         function allItemsSelectedSlicerTestHelper(
             interactivityService: powerbi.visuals.IInteractivityService,
@@ -200,6 +216,24 @@ module powerbitests {
             expect(slicerData.slicerDataPoints[0].count).toBeUndefined();
             expect(slicerData.slicerDataPoints[1].count).toBe(3);
             expect(slicerData.slicerDataPoints[2].count).toBe(4);
+        });
+
+        it('slicer convert dataview contains blank value', () => {
+            let dataViewMetadata: powerbi.DataViewMetadata = slicerHelper.buildDefaultDataViewMetadata();
+            let dataViewCategoricalWithUndefinedValue: powerbi.DataViewCategorical = slicerHelper.buildDefaultDataViewCategorical(field, true);
+            let dataView: powerbi.DataView = {
+                metadata: dataViewMetadata,
+                categorical: dataViewCategoricalWithUndefinedValue
+            };
+
+            let hostServices = slicerHelper.createHostServices();
+            let interactivityService = powerbi.visuals.createInteractivityService(hostServices);
+            let descriptor: powerbi.ValueTypeDescriptor = { bool: true };
+            let dataViews = applyDataTransform(dataView, undefined, descriptor);
+            let slicerData = powerbi.visuals.DataConversion.convert(dataViews[0], slicerHelper.SelectAllTextKey, interactivityService, hostServices);
+            expect(slicerData.slicerDataPoints.length).toBe(6);
+            expect(slicerData.slicerDataPoints[5].value).toBe('(Blank)');
+            expect(slicerData.slicerDataPoints[5].count).toBe(1);
         });
 
         function applyDataTransform(dataView: powerbi.DataView, semanticFilter: data.SemanticFilter, descriptor?: powerbi.ValueTypeDescriptor): powerbi.DataView[]{

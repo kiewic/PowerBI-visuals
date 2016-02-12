@@ -24,12 +24,12 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../../_references.ts"/>
 module powerbi.visuals.samples {
     import SelectionManager = utility.SelectionManager;
     import ClassAndSelector = jsCommon.CssConstants.ClassAndSelector;
     import createClassAndSelector = jsCommon.CssConstants.createClassAndSelector;
     import AxisScale = powerbi.visuals.axisScale;
+    import DataRoleHelper = powerbi.data.DataRoleHelper;
 
     export interface AreaRangeChartConstructorOptions {
         animator?: IGenericAnimator;
@@ -413,11 +413,10 @@ module powerbi.visuals.samples {
                     if (dataView.categorical) {
                         var dataViewCat = this.dataViewCat = dataView.categorical;
                         var dvCategories = dataViewCat.categories;
-                        var categoryType = ValueType.fromDescriptor({ text: true });
+                        var categoryType: ValueType | ValueTypeDescriptor  = ValueType.fromDescriptor({ text: true });
                         if (dvCategories && dvCategories.length > 0 && dvCategories[0].source && dvCategories[0].source.type)
                             categoryType = dvCategories[0].source.type;
 
-                    
                         //var axisType = lineChartProps.categoryAxis.axisType
                         var axisType = AreaRangeChart.properties.general.formatString;
                                                 

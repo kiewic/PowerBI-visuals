@@ -24,12 +24,13 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
+
 
 module powerbitests.slicerHelper {
     import SlicerOrientation = powerbi.visuals.slicerOrientation.Orientation;
     import SQExpr = powerbi.data.SQExpr;
     import ValueType = powerbi.ValueType;
+    import SemanticFilter = powerbi.data.SemanticFilter;
 
     export const SelectAllTextKey = 'Select All';
     export const SlicerVisual = 'slicer';
@@ -72,9 +73,23 @@ module powerbitests.slicerHelper {
     export function createHostServices(): powerbi.IVisualHostServices {
         let hostServices = new powerbi.visuals.DefaultVisualHostServices();
         hostServices.canSelect = () => true;
-        hostServices.analyzedFilter = (options: powerbi.FilterAnalyzerOptions) => {
-            return new mocks.FilterAnalyzerMock(options.filter, options.fieldSQExprs);
+        hostServices.analyzeFilter = (options: powerbi.FilterAnalyzerOptions) => {
+            return new mocks.FilterAnalyzerMock(<SemanticFilter>options.filter, <SQExpr[]>options.fieldSQExprs);
         };
+        hostServices.setIdentityDisplayNames = (displayNamesIdentityPairs: powerbi.DisplayNameIdentityPair[]) => _.noop;
+        hostServices.getIdentityDisplayNames = (identities: powerbi.DataViewScopeIdentity[]) => {
+            let displayNamesIdentityPairs: powerbi.DisplayNameIdentityPair[];
+
+            displayNamesIdentityPairs = _.map(identities, (identity) => {
+                let label = powerbi.data.SQExprConverter.getFirstComparandValue(identity);
+                return {
+                    displayName: label,
+                    identity: identity
+                };
+            });
+            return displayNamesIdentityPairs;
+        };
+
         return hostServices;
     }
 
@@ -173,16 +188,27 @@ module powerbitests.slicerHelper {
         };
     }
 
-    export function buildDefaultDataViewCategorical(field: SQExpr): powerbi.DataViewCategorical {
+    export function buildDefaultDataViewCategorical(field: SQExpr, containsUndefinedValue?: boolean): powerbi.DataViewCategorical {
         let dataViewMetadata = buildDefaultDataViewMetadata();
+        let identities = [mocks.dataViewScopeIdentityWithEquality(field, "Apple"),
+            mocks.dataViewScopeIdentityWithEquality(field, "Orange"),
+            mocks.dataViewScopeIdentityWithEquality(field, "Kiwi"),
+            mocks.dataViewScopeIdentityWithEquality(field, "Grapes"),
+            mocks.dataViewScopeIdentityWithEquality(field, "Banana")];
+
+        let values = ["Apple", "Orange", "Kiwi", "Grapes", "Banana"];
+        let countValues: number[] = [undefined, 3, 4, 5, 6, ];
+
+        if (containsUndefinedValue === true) {
+            identities.push(mocks.dataViewScopeIdentityWithEquality(field, 'undefinedValue'));
+            values.push(undefined);
+            countValues.push(1);
+        }        
+
         let category: powerbi.DataViewCategoryColumn = {
             source: dataViewMetadata.columns[0],
-            values: ["Apple", "Orange", "Kiwi", "Grapes", "Banana"],
-            identity: [mocks.dataViewScopeIdentityWithEquality(field, "Apple"),
-                mocks.dataViewScopeIdentityWithEquality(field, "Orange"),
-                mocks.dataViewScopeIdentityWithEquality(field, "Kiwi"),
-                mocks.dataViewScopeIdentityWithEquality(field, "Grapes"),
-                mocks.dataViewScopeIdentityWithEquality(field, "Banana")],
+            values: values,
+            identity: identities,
             identityFields: [field]
         };
 
@@ -190,13 +216,7 @@ module powerbitests.slicerHelper {
             categories: [category],
             values: powerbi.data.DataViewTransform.createValueColumns([{
                 source: dataViewMetadata.columns[0],
-                values: [
-                    undefined,
-                    3,
-                    4,
-                    5,
-                    6,
-                ]
+                values: countValues,
             }])
         };
 
@@ -255,7 +275,7 @@ module powerbitests.slicerHelper {
             categories: [category]
         };
         for (let count = 1; count < 6; count++) {
-            let imageUrl: string = "http://dummyimage.com/600x400/000/fff&text=" + count;
+            let imageUrl: string = "http://dummyimage.com/600x400/000/fff&text=" + count + '.png';
             category.values.push(imageUrl);
             let scopeId = mocks.dataViewScopeIdentityWithEquality(field, imageUrl);
             category.identity.push(scopeId);

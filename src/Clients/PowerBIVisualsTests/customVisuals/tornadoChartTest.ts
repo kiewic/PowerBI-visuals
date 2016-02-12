@@ -24,7 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
+
 
 module powerbitests.customVisuals {
     import VisualClass = powerbi.visuals.samples.TornadoChart;
@@ -40,7 +40,7 @@ module powerbitests.customVisuals {
 
             beforeEach(() => {
                 visualBuilder = new TornadoChartBuilder();
-                dataViews = [powerbitests.customVisuals.sampleDataViews.salesByCountryData()];
+                dataViews = [new powerbitests.customVisuals.sampleDataViews.SalesByCountryData().getDataView()];
             });
 
             it("svg element created", () =>expect(visualBuilder.mainElement[0]).toBeInDOM());

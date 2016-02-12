@@ -24,7 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
+
 
 module powerbitests.customVisuals {
     import VisualClass = powerbi.visuals.samples.AreaRangeChart;
@@ -40,7 +40,7 @@ module powerbitests.customVisuals {
 
             beforeEach(() => {
                 visualBuilder = new AreaRangeChartBuilder();
-                dataViews = [powerbitests.customVisuals.sampleDataViews.areaRangeChartData()];
+                dataViews = [new powerbitests.customVisuals.sampleDataViews.AreaRangeChartData().getDataView()];
             });
 
             it("svg element created", () => expect(visualBuilder.mainElement[0]).toBeInDOM());

@@ -24,7 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
+
 
 module powerbitests.customVisuals {
     import VisualClass = powerbi.visuals.samples.ChordChart;
@@ -40,7 +40,7 @@ module powerbitests.customVisuals {
 
             beforeEach(() => {
                 visualBuilder = new ChordChartBuilder();
-                dataViews = [powerbitests.customVisuals.sampleDataViews.chortChartData()];
+                dataViews = [new powerbitests.customVisuals.sampleDataViews.ChortChartData().getDataView()];
             });
 
             it("svg element created", () => expect(visualBuilder.mainElement[0]).toBeInDOM());

@@ -27,7 +27,8 @@
 /// <reference path="../_references.ts"/>
 
 module powerbi.visuals {
-    import SQExprConverter = powerbi.data.SQExprConverter;
+    import SemanticFilter = powerbi.data.SemanticFilter;
+    import Utility = jsCommon.Utility;
 
     /** Helper module for converting a DataView into SlicerData. */
     export module DataConversion {
@@ -41,12 +42,12 @@ module powerbi.visuals {
             if (!identityFields)
                 return;
 
-            let filter: data.SemanticFilter = <data.SemanticFilter>(
+            let filter: SemanticFilter = <SemanticFilter>(
                 dataView.metadata &&
                 dataView.metadata.objects &&
                 DataViewObjects.getValue(dataView.metadata.objects, visuals.slicerProps.filterPropertyIdentifier));
 
-            let analyzer = hostServices.analyzedFilter({
+            let analyzer = hostServices.analyzeFilter({
                 dataView: dataView,
                 defaultValuePropertyId: slicerProps.defaultValue,
                 filter: filter,
@@ -54,8 +55,9 @@ module powerbi.visuals {
             });
             if (!analyzer)
                 return;
-
-            if (analyzer.hasDefaultFilterOverride()) {
+            
+            let analyzedSemanticFilter = <SemanticFilter>analyzer.filter;
+            if (analyzedSemanticFilter && !SemanticFilter.isSameFilter(analyzedSemanticFilter, filter)) {
                 (<ISelectionHandler>interactivityService).handleClearSelection();
                 let filterPropertyIdentifier = slicerProps.filterPropertyIdentifier;
                 let properties: { [propertyName: string]: DataViewPropertyValue } = {};
@@ -78,7 +80,7 @@ module powerbi.visuals {
         }
 
         function getSlicerData(
-            filter: data.SemanticFilter,
+            filter: SemanticFilter,
             analyzer: AnalyzedFilter,
             dataViewMetadata: DataViewMetadata,
             categorical: DataViewCategorical,
@@ -103,41 +105,57 @@ module powerbi.visuals {
                 valueCounts = undefined;
 
             debug.assert(!valueCounts || valueCounts.length === categoryValuesLen, "valueCounts doesn't match values");
+            let isImageData = dataViewMetadata &&
+                !_.isEmpty(dataViewMetadata.columns) &&
+                dataViewMetadata.columns[0].type &&
+                dataViewMetadata.columns[0].type.misc &&
+                dataViewMetadata.columns[0].type.misc.imageUrl;
 
+            let displayNameIdentityPairs: DisplayNameIdentityPair[] = [];
             for (let i = 0; i < categoryValuesLen; i++) {
                 let scopeId = category.identity && category.identity[i];
                 let value = category.values && category.values[i];
                 let count = valueCounts && valueCounts[i];
 
-                if (value != null) {
-                    let isRetained = hasSelectionOverride ? SlicerUtil.tryRemoveValueFromRetainedList(scopeId, selectedScopeIds) : false;
-                    let label: string = valueFormatter.format(value, formatString);
-                    // TODO: need to add count as well
-                    let slicerData: SlicerDataPoint = {
-                        value: label,
-                        tooltip: label,
-                        identity: SelectionId.createWithId(scopeId),
-                        selected: isRetained,
-                        count: <number>count,
-                    };
+                let isRetained = hasSelectionOverride ? SlicerUtil.tryRemoveValueFromRetainedList(scopeId, selectedScopeIds) : false;
+                let label: string = valueFormatter.format(value, formatString);
+                let isImage = isImageData && Utility.isValidImageUrl(label);
+                let slicerData: SlicerDataPoint = {
+                    value: label,
+                    tooltip: label,
+                    identity: SelectionId.createWithId(scopeId),
+                    selected: isRetained,
+                    count: <number>count,
+                    isImage: isImage,
+                };
+
+                    if (isRetained) {
+                        let displayNameIdentityPair: DisplayNameIdentityPair = {
+                            displayName: label,
+                            identity: scopeId
+                        };
+                        displayNameIdentityPairs.push(displayNameIdentityPair);
+                    }
 
                     slicerDataPoints.push(slicerData);
                     if (slicerData.selected)
                         numOfSelected++;
                 }
-            }
+
+            if (!_.isEmpty(displayNameIdentityPairs))
+                hostServices.setIdentityDisplayNames(displayNameIdentityPairs);
 
             // Add retained values that are not in the returned dataview to the value list.
             if (hasSelectionOverride) {
-                //TODO: To support group on keys, we need ask hostService for the matching label which should be cached
-                for (let scopeId of selectedScopeIds) {
-                    let label = getLabel(scopeId, formatString);
+                
+                let displayNamesIdentityPairs = hostServices.getIdentityDisplayNames(selectedScopeIds);
 
+                for (let pair of displayNamesIdentityPairs) {
                     // When there is no valueCounts, set count to be undefined, otherwise use 0 as the count for retained values
                     let slicerData: SlicerDataPoint = {
-                        value: label,
-                        tooltip: label,
-                        identity: SelectionId.createWithId(scopeId),
+                        value: pair.displayName,
+                        tooltip: pair.displayName,
+                        identity: SelectionId.createWithId(pair.identity),
                         selected: true,
                         count: valueCounts != null ? 0 : undefined,
                     };
@@ -179,11 +197,6 @@ module powerbi.visuals {
             };
 
             return slicerData;
-        }
-
-        function getLabel(scopeId: DataViewScopeIdentity, formatString: string): string {
-            let label = SQExprConverter.getFirstComparandValue(scopeId);
-            return valueFormatter.format(label, formatString);
         }
 
         function createDefaultSettings(dataViewMetadata: DataViewMetadata): SlicerSettings {

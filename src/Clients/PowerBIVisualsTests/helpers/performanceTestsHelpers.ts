@@ -24,7 +24,7 @@
 *  THE SOFTWARE.
 */
 
-/// <reference path="../_references.ts"/>
+
 
 module powerbitests.performanceTestsHelpers {
     import DataViewValueColumns = powerbi.DataViewValueColumns;
@@ -557,7 +557,7 @@ module powerbitests.performanceTestsHelpers {
 	        case "bulletChart":
                 return 100;
             case "columnChart":
-                return 13;
+                return 20;
             default:
                 return 6;
         }

@@ -24,7 +24,7 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../_references.ts"/>
+
 
 module powerbitests.customVisuals {
     import VisualClass = powerbi.visuals.samples.WordCloud;
@@ -40,7 +40,7 @@ module powerbitests.customVisuals {
             
             beforeEach(() => {
                 visualBuilder = new WordCloudBuilder();
-                dataViews = [powerbitests.customVisuals.sampleDataViews.countriesData()];
+                dataViews = [new powerbitests.customVisuals.sampleDataViews.CountriesData().getDataView()];
             });
 
             it("svg element created", () => expect(visualBuilder.mainElement[0]).toBeInDOM());
