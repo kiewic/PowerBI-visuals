@@ -28,6 +28,9 @@
 
 module powerbi.visuals.samples {
     import SelectionManager = utility.SelectionManager;
+    
+    // Uncomment this line in DevTools (Jan/Feb breaking change)
+    //import DataRoleHelper = powerbi.data.DataRoleHelper;
 
     export interface WaffleChartLayout {
         rows: number;
@@ -68,8 +71,8 @@ module powerbi.visuals.samples {
     var waffleChartRoleNames = {
         category: 'Category',
         values: 'Values',
-        minValue: 'Minimum Value',
-        maxValue: 'Maximum Value',
+        minValue: 'MinValue',
+        maxValue: 'MaxValue',
         paths: 'Paths'
     };
 
@@ -171,8 +174,8 @@ module powerbi.visuals.samples {
         private static DefaultText = 'Invalid DV';
         private root: D3.Selection;
         private dataView: DataView;
-        private selectiionManager: SelectionManager;
         private singleWaffleChartArray: Array<SingleWaffleChart>;
+        private debug: DebugChart;
         private count: number;
         private defaultDataPointColor: string;
 
@@ -306,8 +309,9 @@ module powerbi.visuals.samples {
 
             this.root = d3.select(options.element.get(0))
                 .append('svg');
-
-            this.selectiionManager = new SelectionManager({ hostServices: options.host });
+                
+            this.debug = new DebugChart();
+            this.debug.init(options);
         }
 
         private initWaffles(newCount: number, paths: Array<string>): void {
@@ -334,12 +338,20 @@ module powerbi.visuals.samples {
         }
 
         public update(options: VisualUpdateOptions) {
-            if (!options.dataViews || !options.dataViews[0]) return;
-            var dataView = this.dataView = options.dataViews[0];
-            var viewport = options.viewport;
+            // Adding try, because something started failing after upgrading Desktop client to January 2016 version.
+            try {
+                if (!options.dataViews || !options.dataViews[0]) return;
+                var dataView = this.dataView = options.dataViews[0];
+                var viewport = options.viewport;
 
-            var viewModel: WaffleChartViewModel = WaffleChart.converter(dataView);
-            this.initWaffles(viewModel.count, viewModel.paths);
+                var viewModel: WaffleChartViewModel = WaffleChart.converter(dataView);
+                this.initWaffles(viewModel.count, viewModel.paths);
+            }
+            catch (err) {
+                alert(err);
+            }
+            
+            this.debug.update(options, undefined);
 
             if (dataView.metadata && dataView.metadata.objects) {
                 var defaultColor = DataViewObjects.getFillColor(dataView.metadata.objects, waffleChartProps.dataPoint.defaultColor);
@@ -667,4 +679,47 @@ module powerbi.visuals.samples {
         public destroy(): void {
         }
     }
+    
+    export class DebugChart {
+        private root: D3.Selection;
+        private fo: D3.Selection;
+        
+        public init(options: VisualInitOptions): void {
+            this.root = d3.select(options.element.get(0))
+                .select('svg');
+        }
+        
+        public update(options: VisualUpdateOptions, err) {
+            var viewport = options.viewport;
+            var dataView = options.dataViews[0];
+            var categoricalValues = dataView.categorical.values;
+            
+            if (this.fo) {
+                this.fo.remove();
+            }
+                
+            this.fo = this.root.append('foreignObject');
+            
+            this.fo.attr({
+                'x': 0,
+                'y': 0,
+                'height': viewport.height,
+                'width': viewport.width
+            });
+                        
+            var foBody = this.fo.append('xhtml:body');
+            
+            var p = foBody.append('p');
+            p.attr('style', 'font-size:11px;')
+
+            if (err) {
+                var text = p.text(JSON.stringify(err));
+            }
+            else {
+                var text = p.text(JSON.stringify(dataView.categorical));
+            }
+        }
+    }
 }
+
+
