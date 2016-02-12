@@ -24,13 +24,8 @@
  *  THE SOFTWARE.
  */
 
-/// <reference path="../../_references.ts"/>
-
 module powerbi.visuals.samples {
-    import SelectionManager = utility.SelectionManager;
-    
-    // Uncomment this line in DevTools (Jan/Feb breaking change)
-    //import DataRoleHelper = powerbi.data.DataRoleHelper;
+    import DataRoleHelper = powerbi.data.DataRoleHelper;
 
     export interface WaffleChartLayout {
         rows: number;

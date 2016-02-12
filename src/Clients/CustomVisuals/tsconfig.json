@@ -20,6 +20,7 @@
         "visuals/gantt/gantt.ts",
         "visuals/globeMap/globeMap.ts",
         "visuals/helloIVisual/helloIVisual.ts",
+        "visuals/waffleChart/waffleChart.ts",
         "visuals/histogram/histogram.ts",
         "visuals/mekkoChart/mekkoChart.ts",
         "visuals/radarChart/radarChart.ts",
