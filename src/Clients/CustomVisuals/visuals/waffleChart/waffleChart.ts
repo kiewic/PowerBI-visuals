@@ -157,6 +157,9 @@ module powerbi.visuals.samples {
                 }
             }
         },
+        sorting: {
+          default: {},
+        },
     };
 
     // DevTools do not support yet `export const waffleChartProps`.
