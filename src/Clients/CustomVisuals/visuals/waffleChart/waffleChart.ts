@@ -25,6 +25,7 @@
  */
 
 module powerbi.visuals.samples {
+    import SelectionManager = utility.SelectionManager;
     import DataRoleHelper = powerbi.data.DataRoleHelper;
 
     export interface WaffleChartLayout {
@@ -180,6 +181,7 @@ module powerbi.visuals.samples {
         private debug: DebugChart;
         private count: number;
         private defaultDataPointColor: string;
+        private selectionManager: SelectionManager;
 
         public static converter(dataView: DataView): WaffleChartViewModel {
             // TODO: throw exception if there is no categorical view, however the following exception
@@ -246,7 +248,6 @@ module powerbi.visuals.samples {
                     }
                     else {
                         console.log("No matching source ...");
-                        console.log(categoricalValues[i].source);
                     }
                 }
             }
@@ -317,6 +318,8 @@ module powerbi.visuals.samples {
         public init(options: VisualInitOptions): void {
             this.defaultDataPointColor = 'Coral';
 
+            this.selectionManager = new SelectionManager({ hostServices: options.host });
+
             this.root = d3.select(options.element.get(0))
                 .append('svg');
                 
@@ -347,6 +350,33 @@ module powerbi.visuals.samples {
             }
         }
 
+        private initSelectionManager(identities: DataViewScopeIdentity[]) {
+            var selection = d3.selectAll('g.singleWaffle');
+
+            // Bound data with join-by-index.
+            selection.data(identities);
+
+            // Using a local variable to avoid errors later when using 'this'.
+            var selectionManager = this.selectionManager;
+
+            this.root.on('click', function() {
+                selectionManager.clear().then(() => selection.style('opacity', 1))
+            });
+
+            selection.on('click', function (d) {
+                selectionManager.select(SelectionId.createWithId(d)).then((ids) => {
+                    if (ids.length > 0) {
+                        selection.style('opacity', 0.5);
+                        d3.select(this).style('opacity', 1);
+                    } else {
+                        selection.style('opacity', 1);
+                    }
+                });
+
+                d3.event.stopPropagation();
+            });
+        }
+
         public update(options: VisualUpdateOptions) {
             var debugMessage = undefined;
             
@@ -359,12 +389,13 @@ module powerbi.visuals.samples {
 
                 var viewModel: WaffleChartViewModel = WaffleChart.converter(dataView);
                 this.initWaffles(viewModel.count, viewModel.paths);
+                this.initSelectionManager(viewModel.identities);
             }
             catch (err) {
-                alert(err);
+                console.log(err);
             }
-            
-            this.debug.update(options, debugMessage);
+
+            //this.debug.update(options, debugMessage);
 
             if (dataView.metadata && dataView.metadata.objects) {
                 var defaultColor = DataViewObjects.getFillColor(dataView.metadata.objects, waffleChartProps.dataPoint.defaultColor);
@@ -548,6 +579,9 @@ module powerbi.visuals.samples {
         public init(options: SingleWaffleChartInitOptions): void {
             this.waffleG = options.root
                 .append('g');
+
+            // Add a class to query this groups by class.
+            this.waffleG.attr('class', 'singleWaffle');
 
             this.backgroundRect = this.waffleG
                 .append('rect');
