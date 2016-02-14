@@ -658,7 +658,8 @@ module powerbi.visuals.samples {
 
             this.backgroundRect
                 .style({
-                    'fill': 'LightCyan',
+                    //'fill': 'LightCyan',
+                    fill: 'transparent',
                     'width': options.width,
                     'height': options.height,
                 });
@@ -679,7 +680,8 @@ module powerbi.visuals.samples {
             }
 
             this.dotBackgroundRect.style({
-                'fill': 'LightCyan',
+                //'fill': 'LightCyan',
+                fill: 'transparent',
                 'width': chartSide,
                 'height': chartSide,
             });
