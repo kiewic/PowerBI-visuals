@@ -120,6 +120,7 @@ module powerbi.visuals.samples {
                         dataReductionAlgorithm: { top: {} }
                     }
                 },
+                // Specifies a constraint on the number of data rows supported by the visual.
                 rowCount: { preferred: { min: 2 }, supported: { min: 0 } }
             },
         }],
@@ -191,15 +192,33 @@ module powerbi.visuals.samples {
             //}
 
             var labelsArray: Array<string>;
+            var dataType: ValueTypeDescriptor;
             var identities: DataViewScopeIdentity[];
             var objects: DataViewObjects[];
             if (dataView.categorical.categories && dataView.categorical.categories.length > 0) {
                 var category0 = dataView.categorical.categories[0]; 
-                
+
                 // Copy arrays.
                 labelsArray = category0.values.slice();
                 identities = category0.identity.slice();
                 objects = category0.objects ? category0.objects.slice() : null;
+
+                dataType = category0.source.type;
+            }
+
+            if (dataType && dataType.dateTime)
+            {
+                var formatter : IValueFormatter;
+                for (var i = 0; i < labelsArray.length; i++) {
+                    formatter = valueFormatter.create({
+                        format: 'O',
+                        value: labelsArray[i],
+                        value2: labelsArray[i],
+                        tickCount: 6
+                    });
+
+                    labelsArray[i] = formatter.format(labelsArray[i]);
+                }
             }
 
             var minValues: Array<number>;
@@ -429,7 +448,7 @@ module powerbi.visuals.samples {
                     fontFamily: 'tahoma',
                     value: viewModel.values && viewModel.values[i] ? viewModel.values[i] : 0,
                     text: viewModel.labelsArray && viewModel.labelsArray[i] ? viewModel.labelsArray[i] : '(Blank)',
-                    identity: viewModel.identities && viewModel.identities[i] ? viewModel.identities[i] : null, 
+                    identity: viewModel.identities && viewModel.identities[i] ? viewModel.identities[i] : null,
                     color: viewModel.objects && viewModel.objects[i] ? WaffleChart.getColor(viewModel.objects[i], this.defaultDataPointColor) : this.defaultDataPointColor,
                 });
             }
