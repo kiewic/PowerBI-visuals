@@ -116,7 +116,11 @@ module powerbi.visuals.samples {
                 values: {
                     group: {
                         by: waffleChartRoleNames.paths,
-                        select: [{ for: { in: waffleChartRoleNames.values } }],
+                        select: [
+                            { bind: { to: waffleChartRoleNames.values } },
+                            { bind: { to: waffleChartRoleNames.minValue } },
+                            { bind: { to: waffleChartRoleNames.maxValue } },
+                        ],
                         dataReductionAlgorithm: { top: {} }
                     }
                 },
