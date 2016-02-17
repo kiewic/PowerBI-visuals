@@ -312,15 +312,18 @@ module powerbi.visuals.samples {
                 // Normalize values.
                 var maxValue: number = Math.max.apply(null, totals);
 
-                // If there are min and max values, calculate percentage.
+                // If there are max values (and optionally min values), calculate percentage.
                 // If numbers are bellow 100, consider totals are already percentages.
                 // Otherwise, calculate percentages considering the max value in totals to be the 100%.
-                if (minValues && maxValues) {
+                // TODO: Unit test these calculations.
+                if (maxValues) {
                     for (var i = 0; i < totals.length; i++) {
-                        var range = maxValues[i] - minValues[i];
+                        var localMaxValue = maxValues[i];
+                        var localMinValue =  minValues && minValues[i] ? minValues[i] : 0; 
+                        var range =localMaxValue - localMinValue;
 
                         // TODO: Validate that totals[i] is greater than minValues[i].
-                        totals[i] = Math.round((totals[i] - minValues[i]) * 100 / range);
+                        totals[i] = Math.round((totals[i] - localMinValue) * 100 / range);
                     }
                 }
                 else if (maxValue > 100) {
