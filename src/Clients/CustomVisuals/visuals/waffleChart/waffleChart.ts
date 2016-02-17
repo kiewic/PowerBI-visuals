@@ -241,6 +241,12 @@ module powerbi.visuals.samples {
                     pathsGroups.push(pathD);
                 }
 
+                // This is necessary for backward compatability with Power BI Desktop client Dec 2015
+                // and Jan 2016. 
+                if (DataRoleHelper === undefined) {
+                    DataRoleHelper = powerbi.visuals.DataRoleHelper;
+                }
+
                 // Arrays are got by reference, so, modifying the array modifies the source too.
                 var currentPathIndex: number = 0;
                 for (var i = 0; i < categoricalValues.length; i++) {
