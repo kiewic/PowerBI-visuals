@@ -189,12 +189,6 @@ module powerbi.visuals.samples {
         private selectionManager: SelectionManager;
 
         public static converter(dataView: DataView): WaffleChartViewModel {
-            // TODO: throw exception if there is no categorical view, however the following exception
-            // is swallowed by Power BI Desktop and so it is useless.
-            //if (!dataView.categorical) {
-            //    throw 'No categorical data.';
-            //}
-
             var labelsArray: Array<string>;
             var dataType: ValueTypeDescriptor;
             var identities: DataViewScopeIdentity[];
@@ -229,6 +223,7 @@ module powerbi.visuals.samples {
             var maxValues: Array<number>;
             var paths: Array<string>;
             var totals: Array<number>;
+            var firstDisplayName: string;
 
             if (dataView.categorical.values && dataView.metadata && dataView.metadata.columns) {
                 var categoricalValues = dataView.categorical.values;
@@ -245,6 +240,11 @@ module powerbi.visuals.samples {
                 // and Jan 2016. 
                 if (DataRoleHelper === undefined) {
                     DataRoleHelper = powerbi.visuals.DataRoleHelper;
+                }
+                    
+                // Get the first user display name in case there are no categories selected.
+                if (categoricalValues[0] && categoricalValues[0].source) {
+                    firstDisplayName = categoricalValues[0].source.displayName;
                 }
 
                 // Arrays are got by reference, so, modifying the array modifies the source too.
@@ -263,7 +263,6 @@ module powerbi.visuals.samples {
                             paths = new Array(localValues.length);
                         }
 
-                        // totals += localValues
                         WaffleChart.sumValues(totals, localValues, paths, pathsGroups[currentPathIndex]);
 
                         // These values were for the current path, move to the next one.
@@ -295,6 +294,13 @@ module powerbi.visuals.samples {
             }
             else if (totals) {
                 count = totals.length;
+                
+                // When there are no categories set (there should be only one value), set the label to 
+                // the first 'display name'.
+                if (totals.length == 1) {
+                    labelsArray = [];
+                    labelsArray.push(firstDisplayName);
+                }
             }
             else {
                 console.log('No categories or values.');
@@ -384,6 +390,10 @@ module powerbi.visuals.samples {
 
         private initSelectionManager(identities: DataViewScopeIdentity[]) {
             var selection = d3.selectAll('g.singleWaffle');
+
+            if (!identities) {
+                return;
+            }
 
             // Bound data with join-by-index.
             selection.data(identities);
