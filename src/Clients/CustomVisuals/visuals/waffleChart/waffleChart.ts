@@ -219,10 +219,10 @@ module powerbi.visuals.samples {
                 }
             }
 
-            var minValues: Array<number>;
-            var maxValues: Array<number>;
             var paths: Array<string>;
             var totals: Array<number>;
+            var minTotals: Array<number>;
+            var maxTotals: Array<number>;
             var firstDisplayName: string;
 
             if (dataView.categorical.values && dataView.metadata && dataView.metadata.columns) {
@@ -269,21 +269,38 @@ module powerbi.visuals.samples {
                         currentPathIndex++;
                     }
                     else if (DataRoleHelper.hasRole(categoricalValues[i].source, waffleChartRoleNames.minValue)) {
-                        minValues = localValues;
+                        if (!minTotals) {
+                            minTotals = new Array(localValues.length);
+                            for (var j = 0; j < maxTotals.length; j++) {
+                                minTotals[j] = 0;
+                            }
+                        }
+                        
+                        // Find no null values and copy into the minTotals array.
+                        for (var j = 0; j < localValues.length; j++) {
+                            if (localValues[j] !== null) {
+                                minTotals[j] = localValues[j];
+                            }
+                        }
                     }
                     else if (DataRoleHelper.hasRole(categoricalValues[i].source, waffleChartRoleNames.maxValue)) {
-                        maxValues = localValues;
-                    }
-                    else {
-                        console.log("No matching source ...");
+                        if (!maxTotals) {
+                            maxTotals = new Array(localValues.length);
+                            for (var j = 0; j < maxTotals.length; j++) {
+                                // Picking an arbitrary value different of 0, to minimize the chance of division by zero.
+                                maxTotals[j] = 1;
+                            }
+                        }
+
+                        // Find no null values and copy into the maxTotals array.
+                        for (var j = 0; j < localValues.length; j++) {
+                            if (localValues[j] !== null) {
+                                maxTotals[j] = localValues[j];
+                            }
+                        }
                     }
                 }
             }
-
-            //// TODO: Find something appropriate to show when the categorical data does not follow the capabilities.
-            //if (!totals) {
-            //    totals = [1, 2, 3, 4, 5, 6, 7];
-            //}
 
             var count : number;
             if (labelsArray && totals) {
@@ -322,10 +339,10 @@ module powerbi.visuals.samples {
                 // If numbers are bellow 100, consider totals are already percentages.
                 // Otherwise, calculate percentages considering the max value in totals to be the 100%.
                 // TODO: Unit test these calculations.
-                if (maxValues) {
-                    for (var i = 0; i < totals.length; i++) {
-                        var localMaxValue = maxValues[i];
-                        var localMinValue =  minValues && minValues[i] ? minValues[i] : 0; 
+                if (maxTotals) {
+                    for (var i = 0; i < maxTotals.length; i++) {
+                        var localMaxValue = maxTotals[i] ? maxTotals[i] : 100;
+                        var localMinValue =  minTotals && minTotals[i] ? minTotals[i] : 0; 
                         var range =localMaxValue - localMinValue;
 
                         // TODO: Validate that totals[i] is greater than minValues[i].
