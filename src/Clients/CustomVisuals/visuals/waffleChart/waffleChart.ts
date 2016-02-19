@@ -406,7 +406,7 @@ module powerbi.visuals.samples {
         }
 
         private initSelectionManager(identities: DataViewScopeIdentity[]) {
-            var selection = d3.selectAll('g.singleWaffle');
+            var selection = this.root.selectAll('g.singleWaffle');
 
             if (!identities) {
                 return;
