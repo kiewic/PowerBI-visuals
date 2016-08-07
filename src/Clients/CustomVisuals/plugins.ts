@@ -44,6 +44,12 @@ module powerbi.visuals.plugins {
         create: () => new samples.HelloIVisual()
     };
 
+    export let waffleChart: IVisualPlugin = {
+        name: 'waffleChart',
+        capabilities: samples.WaffleChart.capabilities,
+        create: () => new samples.WaffleChart()
+    };
+
     export let asterPlot: IVisualPlugin = {
         name: 'asterPlot',
         capabilities: samples.AsterPlot.capabilities,
