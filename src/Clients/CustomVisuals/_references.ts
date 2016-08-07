@@ -10,6 +10,7 @@
 /// <reference path="./visuals/sankeyDiagram/visual/sankeyDiagram.ts"/>
 /// <reference path="./visuals/bulletChart/visual/bulletChart.ts"/>
 /// <reference path="./visuals/wordCloud/visual/wordCloud.ts"/>
+/// <reference path="./visuals/waffleChart/waffleChart.ts"/>
 /// <reference path="./visuals/chicletSlicer/visual/chicletSlicer.ts"/>
 /// <reference path="./visuals/chordChart/visual/chordChart.ts"/>
 /// <reference path="./visuals/enhancedScatterChart/visual/enhancedScatterChart.ts"/>
